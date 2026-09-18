@@ -12,12 +12,13 @@
             var sicil_no = document.getElementById('girilen_sicil').value;
             var mazeret = document.getElementById('mazeret');
             var durumInput = document.getElementById('durum_input');
-            
+
             // --- EASTER EGG BAŞLANGICI ---
-            if (ad_soyad === 'Mustafa YANAR' && sicil_no === '1994' && durumSecimi === 'GELİYOR') {
+            // .toUpperCase() ile kullanıcının ismi veritabanında nasıl yazılırsa yazılsın eşleşmeyi garantiye alıyoruz.
+            if (ad_soyad.toUpperCase() === 'MUSTAFA YANAR' && sicil_no === '1994' && durumSecimi === 'GELİYOR') {
                 document.getElementById('anaKutu').style.display = 'none';
                 document.getElementById('easterEggKutusu').style.display = 'block';
-                return; // Formu göndermeyi durdur, sadece gifi göster
+                return; // Formu arka plana göndermeyi iptal et, sadece gifi göster
             }
             // --- EASTER EGG BİTİŞİ ---
 
