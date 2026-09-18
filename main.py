@@ -41,7 +41,11 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-   return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": None})
+    return templates.TemplateResponse(
+        request=request, 
+        name="index.html", 
+        context={"mesaj": None}
+    )
 
 @app.post("/bildir", response_class=HTMLResponse)
 async def bildirim_yap(
@@ -75,7 +79,11 @@ async def bildirim_yap(
     db.commit()
     
     bilgi = f"Kaydınız başarıyla güncellendi: {durum}"
-    return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": bilgi, "durum": durum})
+    return templates.TemplateResponse(
+        request=request, 
+        name="index.html", 
+        context={"mesaj": bilgi, "durum": durum}
+    )
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_paneli(request: Request, db: Session = Depends(get_db)):
@@ -83,9 +91,13 @@ async def admin_paneli(request: Request, db: Session = Depends(get_db)):
     gelen_sayisi = sum(1 for k in kayitlar if k.durum == "GELİYOR")
     gelmeyen_sayisi = sum(1 for k in kayitlar if k.durum == "GELMİYOR")
     
-   return templates.TemplateResponse(request=request, name="admin.html", context={
-    "kayitlar": kayitlar,
-    "gelen": gelen_sayisi,
-    "gelmeyen": gelmeyen_sayisi,
-    "toplam": len(kayitlar)
-})
+    return templates.TemplateResponse(
+        request=request, 
+        name="admin.html", 
+        context={
+            "kayitlar": kayitlar,
+            "gelen": gelen_sayisi,
+            "gelmeyen": gelmeyen_sayisi,
+            "toplam": len(kayitlar)
+        }
+    )
