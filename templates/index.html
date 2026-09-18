@@ -12,6 +12,14 @@
             var sicil_no = document.getElementById('girilen_sicil').value;
             var mazeret = document.getElementById('mazeret');
             var durumInput = document.getElementById('durum_input');
+            
+            // --- EASTER EGG BAŞLANGICI ---
+            if (ad_soyad === 'Mustafa YANAR' && sicil_no === '1994' && durumSecimi === 'GELİYOR') {
+                document.getElementById('anaKutu').style.display = 'none';
+                document.getElementById('easterEggKutusu').style.display = 'block';
+                return; // Formu göndermeyi durdur, sadece gifi göster
+            }
+            // --- EASTER EGG BİTİŞİ ---
 
             if (!ad_soyad) {
                 alert("Lütfen listeden isminizi seçiniz.");
@@ -33,7 +41,9 @@
     </script>
 </head>
 <body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md border border-slate-200">
+
+    <!-- NORMAL MESAİ FORMU KUTUSU -->
+    <div id="anaKutu" class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md border border-slate-200">
         <div class="text-center mb-6">
             <h1 class="text-xl font-bold text-slate-800">Pazar Mesaisi Bildirimi</h1>
             <p class="text-sm text-slate-500 mt-1">Lütfen kimliğinizi doğrulayıp seçiminizi yapın</p>
@@ -86,5 +96,22 @@
             </div>
         </form>
     </div>
+
+    <!-- EASTER EGG GİZLİ KUTUSU (Varsayılan olarak görünmez) -->
+    <div id="easterEggKutusu" style="display: none;" class="bg-black p-6 rounded-2xl shadow-2xl w-full max-w-md border-4 border-yellow-500 text-center animate-pulse">
+        <h1 class="text-3xl font-black text-yellow-400 mb-6 uppercase tracking-widest">SELAM SANA İMPARATOR</h1>
+        
+        <div class="w-full bg-white rounded-lg overflow-hidden mb-4">
+            <div class="tenor-gif-embed" data-postid="962526223077777279" data-share-method="host" data-aspect-ratio="0.562249" data-width="100%">
+                <a href="https://tenor.com/view/selam-sana-imparator-gif-962526223077777279">Selam Sana Imparator GIF</a>
+            </div> 
+            <script type="text/javascript" async src="https://tenor.com/embed.js"></script>
+        </div>
+        
+        <button onclick="window.location.reload()" class="mt-4 bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-6 rounded-full transition-all">
+            Emrinize Amadeyim (Geri Dön)
+        </button>
+    </div>
+
 </body>
 </html>
