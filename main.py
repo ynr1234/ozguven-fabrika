@@ -28,6 +28,8 @@ class MesaiKayit(Base):
     mazeret = Column(String(255), nullable=True)
     guncelleme_zamani = Column(DateTime, default=datetime.utcnow)
 
+# Eğer eski tablo varsa önce siler, sonra yeni (departman ve unvan eklenmiş) haliyle sıfırdan oluşturur
+MesaiKayit.__table__.drop(engine, checkfirst=True)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Pazar Mesaisi Bildirim Sistemi")
