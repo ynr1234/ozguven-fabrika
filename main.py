@@ -41,7 +41,7 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-   return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": None}))
+   return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": None})
 
 @app.post("/bildir", response_class=HTMLResponse)
 async def bildirim_yap(
