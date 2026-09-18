@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from personel_data import PERSONEL_DB
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./local_test.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -21,6 +22,8 @@ class MesaiKayit(Base):
     id = Column(Integer, primary_key=True, index=True)
     sicil_no = Column(String(50), index=True)
     ad_soyad = Column(String(100))
+    departman = Column(String(100))
+    unvan = Column(String(100))
     durum = Column(String(20))
     mazeret = Column(String(255), nullable=True)
     guncelleme_zamani = Column(DateTime, default=datetime.utcnow)
@@ -30,16 +33,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Pazar Mesaisi Bildirim Sistemi")
 templates = Jinja2Templates(directory="templates")
 
-# --- FABRİKA PERSONEL LİSTESİ ---
-# Format: "SicilNo - Ad Soyad". Bu listeyi kendi güncel bordronuza göre uzatabilirsiniz.
-PERSONEL_LISTESI = [
-    "1001 - Ahmet Yılmaz",
-    "1002 - Caner Şahin",
-    "1003 - Elif Öztürk",
-    "1004 - Mehmet Demir",
-    "1005 - Seda Yılmaz",
-    "1006 - Veli Kaya"
-]
+# İsim listesini alfabetik olarak şablona göndermek için
+PERSONEL_ISIMLERI = list(PERSONEL_DB.keys())
 
 def get_db():
     db = SessionLocal()
@@ -53,35 +48,68 @@ async def index(request: Request):
     return templates.TemplateResponse(
         request=request, 
         name="index.html", 
-        context={"mesaj": None, "personeller": PERSONEL_LISTESI}
+        context={"mesaj": None, "personeller": PERSONEL_ISIMLERI}
     )
 
 @app.post("/bildir", response_class=HTMLResponse)
 async def bildirim_yap(
     request: Request,
-    personel_bilgisi: str = Form(...),
+    ad_soyad: str = Form(...),
+    girilen_sicil: str = Form(...),
     durum: str = Form(...),
     mazeret: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    # Formdan "1001 - Ahmet Yılmaz" olarak gelen veriyi ikiye ayırıyoruz
-    try:
-        sicil_no, ad_soyad = personel_bilgisi.split(" - ", 1)
-    except ValueError:
-        sicil_no = "HATA"
-        ad_soyad = personel_bilgisi
+    ad_soyad = ad_soyad.strip()
+    girilen_sicil = girilen_sicil.strip()
+    
+    # 1. Personel listede var mı?
+    if ad_soyad not in PERSONEL_DB:
+        hata = "Seçilen personel sistemde bulunamadı."
+        return templates.TemplateResponse(
+            request=request, 
+            name="index.html", 
+            context={"mesaj": hata, "hata": True, "personeller": PERSONEL_ISIMLERI}
+        )
+    
+    gercek_personel = PERSONEL_DB[ad_soyad]
+    
+    # 2. Sicil Numarası (PIN) eşleşiyor mu?
+    if gercek_personel["sicil_no"] != girilen_sicil:
+        hata = "Hatalı Sicil Numarası girdiniz. Lütfen tekrar deneyin."
+        return templates.TemplateResponse(
+            request=request, 
+            name="index.html", 
+            context={"mesaj": hata, "hata": True, "personeller": PERSONEL_ISIMLERI}
+        )
+        
+    # 3. Mazeret kontrolü (Backend doğrulaması)
+    if durum == "GELMİYOR" and (not mazeret or not mazeret.strip()):
+        hata = "Gelmeyeceğinizi belirttiniz. Lütfen mazeretinizi yazınız."
+        return templates.TemplateResponse(
+            request=request, 
+            name="index.html", 
+            context={"mesaj": hata, "hata": True, "personeller": PERSONEL_ISIMLERI}
+        )
 
-    mevcut_kayit = db.query(MesaiKayit).filter(MesaiKayit.sicil_no == sicil_no).first()
+    # Doğrulama başarılı, kaydı UPSERT yap (Varsa güncelle, yoksa ekle)
+    gercek_sicil = gercek_personel["sicil_no"]
+    
+    mevcut_kayit = db.query(MesaiKayit).filter(MesaiKayit.sicil_no == gercek_sicil).first()
     
     if mevcut_kayit:
         mevcut_kayit.ad_soyad = ad_soyad
+        mevcut_kayit.departman = gercek_personel["departman"]
+        mevcut_kayit.unvan = gercek_personel["unvan"]
         mevcut_kayit.durum = durum
         mevcut_kayit.mazeret = mazeret
         mevcut_kayit.guncelleme_zamani = datetime.utcnow()
     else:
         yeni_kayit = MesaiKayit(
-            sicil_no=sicil_no,
+            sicil_no=gercek_sicil,
             ad_soyad=ad_soyad,
+            departman=gercek_personel["departman"],
+            unvan=gercek_personel["unvan"],
             durum=durum,
             mazeret=mazeret
         )
@@ -89,11 +117,11 @@ async def bildirim_yap(
     
     db.commit()
     
-    bilgi = f"Kaydınız başarıyla güncellendi: {durum}"
+    bilgi = f"İşlem Başarılı. Kaydınız oluşturuldu: {durum}"
     return templates.TemplateResponse(
         request=request, 
         name="index.html", 
-        context={"mesaj": bilgi, "durum": durum, "personeller": PERSONEL_LISTESI}
+        context={"mesaj": bilgi, "hata": False, "durum": durum, "personeller": PERSONEL_ISIMLERI}
     )
 
 @app.get("/admin", response_class=HTMLResponse)
