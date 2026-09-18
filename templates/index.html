@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pazar Mesaisi Bildirimi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md border border-slate-200">
+        <div class="text-center mb-6">
+            <h1 class="text-xl font-bold text-slate-800">Pazar Mesaisi Bildirimi</h1>
+            <p class="text-sm text-slate-500 mt-1">Lütfen katılım durumunuzu seçiniz</p>
+        </div>
+
+        {% if mesaj %}
+        <div class="mb-4 p-3 rounded-lg text-center font-semibold text-sm {% if durum == 'GELİYOR' %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-amber-100 text-amber-800 border border-amber-300{% endif %}">
+            {{ mesaj }}
+        </div>
+        {% endif %}
+
+        <form action="/bildir" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Sicil Numarası</label>
+                <input type="text" name="sicil_no" required placeholder="Örn: 1042" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 text-base">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Ad Soyad</label>
+                <input type="text" name="ad_soyad" required placeholder="Adınız Soyadınız" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 text-base">
+            </div>
+
+            <div class="pt-2">
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-2">Pazar Günü Durumunuz</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="submit" name="durum" value="GELİYOR" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center">
+                        <span class="text-lg">✓</span>
+                        <span>GELİYORUM</span>
+                    </button>
+                    <button type="submit" name="durum" value="GELMİYOR" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-4 rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center">
+                        <span class="text-lg">✕</span>
+                        <span>GELEMİYORUM</span>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Mazeret (Gelemiyorsanız zorunludur)</label>
+                <input type="text" name="mazeret" placeholder="Mazeretiniz varsa yazın" class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-1 focus:ring-slate-400">
+            </div>
+        </form>
+    </div>
+</body>
+</html>
