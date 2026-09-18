@@ -838,6 +838,12 @@ PERSONEL_DB = {
         "sicil_no": "0245",
         "unvan": "AMBALAJLAMA OPERATÖRÜ",
         "departman": "SEVKİYAT"
+
+    },
+    "MUSTAFA YANAR": {
+        "sicil_no": "1994",
+        "unvan": "AMBALAJLAMA OPERATÖRÜ",
+        "departman": "SEVKİYAT"
     },
     "ŞEREF SERÇE": {
         "sicil_no": "0225",
