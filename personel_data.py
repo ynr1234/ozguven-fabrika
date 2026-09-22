@@ -1,4 +1,9 @@
 PERSONEL_DB = {
+    "1HURDA GİRİŞİ": {
+        "sicil_no": "0316",
+        "unvan": "-",
+        "departman": "YARDIMCI PERSONEL"
+    },
     "ABDULLAH ACUN": {
         "sicil_no": "0289",
         "unvan": "Damar Büküm Operatörü",
@@ -194,9 +199,19 @@ PERSONEL_DB = {
         "unvan": "KABLO BÜKÜM OPERATÖRÜ",
         "departman": "ÜRETİM"
     },
+    "ERKAN SARI": {
+        "sicil_no": "0010",
+        "unvan": "VARDİYA ÜRETİM ŞEFİ",
+        "departman": "ÜRETİM"
+    },
     "ERKAN YILDIRIM YILMAZ": {
         "sicil_no": "0400",
         "unvan": "BAKIR BÜKÜM OPERATÖRÜ",
+        "departman": "ÜRETİM"
+    },
+    "ERSAN GÜDÜCÜ": {
+        "sicil_no": "0089",
+        "unvan": "ÜRETİM / PLANLAMA SORUMLUSU",
         "departman": "ÜRETİM"
     },
     "ERSAN TUNTUR": {
@@ -222,6 +237,11 @@ PERSONEL_DB = {
     "FATİH ÇAN": {
         "sicil_no": "0321",
         "unvan": "AMBALAJLAMA OPERATÖRÜ",
+        "departman": "ÜRETİM"
+    },
+    "Fatih AYDOĞAN": {
+        "sicil_no": "0282",
+        "unvan": "SATIN ALMA SORUMLUSU",
         "departman": "ÜRETİM"
     },
     "Fatih ELBEĞİ": {
@@ -388,6 +408,11 @@ PERSONEL_DB = {
         "sicil_no": "0464",
         "unvan": "Amb. Opr.",
         "departman": "SEVKİYAT"
+    },
+    "MUSTAFA YASİN ÖZTÜRK": {
+        "sicil_no": "0009",
+        "unvan": "ÜRETİM / PLANLAMA MÜDÜRÜ",
+        "departman": "ÜRETİM"
     },
     "Mehmet Akça": {
         "sicil_no": "0469",
@@ -813,12 +838,6 @@ PERSONEL_DB = {
         "sicil_no": "0245",
         "unvan": "AMBALAJLAMA OPERATÖRÜ",
         "departman": "SEVKİYAT"
-
-    },
-    "MUSTAFA YANAR": {
-        "sicil_no": "1994",
-        "unvan": "AMBALAJLAMA OPERATÖRÜ",
-        "departman": "SEVKİYAT"
     },
     "ŞEREF SERÇE": {
         "sicil_no": "0225",
@@ -829,5 +848,10 @@ PERSONEL_DB = {
         "sicil_no": "0330",
         "unvan": "Extruder operatörü",
         "departman": "ÜRETİM"
+    },
+    "ŞÜKRÜ DEMİR": {
+        "sicil_no": "0102",
+        "unvan": "SEVKİYAT OPERATÖRÜ",
+        "departman": "SEVKİYAT"
     }
 }

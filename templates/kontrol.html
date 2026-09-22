@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acil Stop & Switch Kontrol Formu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        let acilStopSecili = false;
+        let switchSecili = false;
+        let durumSecimi = "";
+
+        function toggleEkipman(tur) {
+            if (tur === 'acil_stop') {
+                acilStopSecili = !acilStopSecili;
+                document.getElementById('btn-acil-stop').className = "w-full py-3 rounded-lg font-bold border-2 transition-all " + 
+                    (acilStopSecili ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-300 text-slate-500 hover:border-blue-400");
+                document.getElementById('acil_stop_val').value = acilStopSecili ? "1" : "0";
+            } else if (tur === 'switch') {
+                switchSecili = !switchSecili;
+                document.getElementById('btn-switch').className = "w-full py-3 rounded-lg font-bold border-2 transition-all " + 
+                    (switchSecili ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-300 text-slate-500 hover:border-blue-400");
+                document.getElementById('switch_val').value = switchSecili ? "1" : "0";
+            }
+        }
+
+        function secimYap(deger) {
+            durumSecimi = deger;
+            document.getElementById('btn-uygun').className = "w-full py-4 rounded-xl font-bold border-2 shadow-sm transition-all flex flex-col items-center justify-center gap-1 active:scale-95 " + 
+                (deger === 'Uygun' ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-slate-200 text-slate-500");
+            document.getElementById('btn-uygun-degil').className = "w-full py-4 rounded-xl font-bold border-2 shadow-sm transition-all flex flex-col items-center justify-center gap-1 active:scale-95 " + 
+                (deger === 'Uygun Değil' ? "bg-rose-500 border-rose-500 text-white" : "bg-white border-slate-200 text-slate-500");
+            
+            document.getElementById('durum_val').value = deger;
+            
+            var aciklamaKutusu = document.getElementById('aciklama');
+            if(deger === 'Uygun Değil') {
+                aciklamaKutusu.setAttribute('placeholder', 'ZORUNLU: Lütfen arızayı/uygunsuzluğu açıklayın...');
+                aciklamaKutusu.className = "w-full px-4 py-3 rounded-lg border-2 border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-rose-50";
+            } else {
+                aciklamaKutusu.setAttribute('placeholder', 'İsteğe bağlı açıklama...');
+                aciklamaKutusu.className = "w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+            }
+        }
+
+        function formKontrol() {
+            var ad_soyad = document.getElementById('ad_soyad').value;
+            var sicil_no = document.getElementById('girilen_sicil').value;
+            var vardiya = document.getElementById('vardiya').value;
+            var mazeret = document.getElementById('aciklama').value;
+
+            if (!vardiya) { alert("Lütfen vardiya seçiniz."); return; }
+            if (!ad_soyad) { alert("Lütfen isminizi seçiniz."); return; }
+            if (!sicil_no) { alert("Lütfen sicil numaranızı giriniz."); return; }
+            if (!acilStopSecili && !switchSecili) {
+                alert("Lütfen kontrol ettiğiniz ekipmanı seçin (Acil Stop veya Switch). İkisini aynı anda da seçebilirsiniz.");
+                return;
+            }
+            if (!durumSecimi) { alert("Lütfen kontrol sonucunu seçiniz (Uygun / Uygun Değil)."); return; }
+            
+            if (durumSecimi === 'Uygun Değil' && mazeret.trim() === '') {
+                alert("Uygunsuzluk bildirdiniz. Lütfen açıklama kısmına arızayı yazınız.");
+                document.getElementById('aciklama').focus();
+                return;
+            }
+
+            document.getElementById('kontrolForm').submit();
+        }
+    </script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200">
+        <!-- Başlık -->
+        <div class="text-center border-b-2 border-slate-100 pb-4 mb-5">
+            <h1 class="text-2xl font-black text-slate-800 tracking-wide">ÖZGÜVEN KABLO</h1>
+            <h2 class="text-lg font-bold text-slate-600 mt-1">Acil Stop & Switch Kontrolü</h2>
+        </div>
+
+        {% if mesaj %}
+        <div class="mb-5 p-3 rounded-lg text-center font-semibold text-sm 
+            {% if hata %} bg-rose-100 text-rose-800 border border-rose-300
+            {% else %} bg-emerald-100 text-emerald-800 border border-emerald-300 {% endif %}">
+            {{ mesaj }}
+        </div>
+        {% endif %}
+
+        <form id="kontrolForm" action="/kontrol/bildir" method="POST" class="space-y-5">
+            
+            <input type="hidden" id="acil_stop_val" name="acil_stop_val" value="0">
+            <input type="hidden" id="switch_val" name="switch_val" value="0">
+            <input type="hidden" id="durum_val" name="durum" value="">
+
+            <!-- Tarih ve Vardiya -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tarih</label>
+                    <input type="date" name="tarih" value="{{ bugun }}" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Vardiya</label>
+                    <select name="vardiya" id="vardiya" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium bg-white">
+                        <option value="" disabled selected>Seçiniz...</option>
+                        <option value="08:00 - 16:00">08:00 - 16:00</option>
+                        <option value="16:00 - 00:00">16:00 - 00:00</option>
+                        <option value="00:00 - 08:00">00:00 - 08:00</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Makine Seçimi -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Makine Adı</label>
+                <select name="makine" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-bold bg-slate-50">
+                    {% for m in makineler %}
+                    <option value="{{ m }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Personel ve Sicil -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Operatör Seçimi</label>
+                    <select name="ad_soyad" id="ad_soyad" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white">
+                        <option value="" disabled selected>İsminiz...</option>
+                        {% for kisi in personeller %}
+                        <option value="{{ kisi }}">{{ kisi }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sicil (Şifre)</label>
+                    <input type="text" pattern="[0-9]*" inputmode="numeric" name="girilen_sicil" id="girilen_sicil" required placeholder="Sicil No" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium">
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Ekipman Türü (Çoklu Seçim) -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-3 text-center">Kontrol Edilen Ekipman (İkisi de seçilebilir)</label>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="btn-acil-stop" onclick="toggleEkipman('acil_stop')" class="w-full py-3 rounded-lg font-bold border-2 bg-white border-slate-300 text-slate-500 hover:border-blue-400 transition-all">
+                        ACİL STOP
+                    </button>
+                    <button type="button" id="btn-switch" onclick="toggleEkipman('switch')" class="w-full py-3 rounded-lg font-bold border-2 bg-white border-slate-300 text-slate-500 hover:border-blue-400 transition-all">
+                        SWITCH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Uygun / Uygun Değil Kararı -->
+            <div class="pt-2">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">Kontrol Sonucu</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="btn-uygun" onclick="secimYap('Uygun')" class="w-full py-4 rounded-xl font-bold border-2 border-slate-200 bg-white text-slate-500 shadow-sm transition-all flex flex-col items-center justify-center gap-1 active:scale-95">
+                        <span class="text-2xl">✓</span>
+                        <span>UYGUN</span>
+                    </button>
+                    <button type="button" id="btn-uygun-degil" onclick="secimYap('Uygun Değil')" class="w-full py-4 rounded-xl font-bold border-2 border-slate-200 bg-white text-slate-500 shadow-sm transition-all flex flex-col items-center justify-center gap-1 active:scale-95">
+                        <span class="text-2xl">✕</span>
+                        <span>UYGUN DEĞİL</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Açıklama Alanı -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Açıklama / Uygunsuzluk Durumu</label>
+                <textarea id="aciklama" name="aciklama" rows="2" placeholder="İsteğe bağlı açıklama..." class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white resize-none transition-all"></textarea>
+            </div>
+
+            <!-- Kaydet Butonu -->
+            <button type="button" onclick="formKontrol()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl shadow-md transition-all mt-4 text-lg">
+                KONTROLÜ KAYDET
+            </button>
+            
+        </form>
+    </div>
+
+</body>
+</html>
