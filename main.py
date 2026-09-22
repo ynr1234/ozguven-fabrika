@@ -52,7 +52,9 @@ async def index(request: Request):
         name="index.html", 
         context={"mesaj": None, "personeller": PERSONEL_ISIMLERI}
     )
-
+@app.get("/bildir", response_class=RedirectResponse)
+async def bildirim_yanlis_giris():
+    return RedirectResponse(url="/", status_code=303)
 @app.post("/bildir", response_class=HTMLResponse)
 async def bildirim_yap(
     request: Request,
