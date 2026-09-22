@@ -68,10 +68,16 @@
         }
     </script>
 </head>
-<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4 font-sans">
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
 
+    <div class="w-full max-w-lg text-left">
+        <a id="anaMenuBtn" href="/" class="mb-4 inline-flex items-center text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200">
+            <span class="mr-2 text-lg leading-none">🔙</span> Ana Menüye Dön
+        </a>
+    </div>
+
+    <!-- KONTROL FORMU KUTUSU -->
     <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200">
-        <!-- Başlık -->
         <div class="text-center border-b-2 border-slate-100 pb-4 mb-5">
             <h1 class="text-2xl font-black text-slate-800 tracking-wide">ÖZGÜVEN KABLO</h1>
             <h2 class="text-lg font-bold text-slate-600 mt-1">Acil Stop & Switch Kontrolü</h2>
@@ -86,12 +92,10 @@
         {% endif %}
 
         <form id="kontrolForm" action="/kontrol/bildir" method="POST" class="space-y-5">
-            
             <input type="hidden" id="acil_stop_val" name="acil_stop_val" value="0">
             <input type="hidden" id="switch_val" name="switch_val" value="0">
             <input type="hidden" id="durum_val" name="durum" value="">
 
-            <!-- Tarih ve Vardiya -->
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tarih</label>
@@ -108,7 +112,6 @@
                 </div>
             </div>
 
-            <!-- Makine Seçimi -->
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Makine Adı</label>
                 <select name="makine" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-bold bg-slate-50">
@@ -118,7 +121,6 @@
                 </select>
             </div>
 
-            <!-- Personel ve Sicil -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Operatör Seçimi</label>
@@ -137,10 +139,8 @@
 
             <hr class="border-slate-100">
 
-            <!-- Ekipman Türü (Çoklu Seçim) -->
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-3 text-center">Kontrol Edilen Ekipman (İkisi de seçilebilir)</label>
-                
                 <div class="grid grid-cols-2 gap-3">
                     <button type="button" id="btn-acil-stop" onclick="toggleEkipman('acil_stop')" class="w-full py-3 rounded-lg font-bold border-2 bg-white border-slate-300 text-slate-500 hover:border-blue-400 transition-all">
                         ACİL STOP
@@ -151,7 +151,6 @@
                 </div>
             </div>
 
-            <!-- Uygun / Uygun Değil Kararı -->
             <div class="pt-2">
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2 text-center">Kontrol Sonucu</label>
                 <div class="grid grid-cols-2 gap-3">
@@ -166,19 +165,15 @@
                 </div>
             </div>
 
-            <!-- Açıklama Alanı -->
             <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Açıklama / Uygunsuzluk Durumu</label>
                 <textarea id="aciklama" name="aciklama" rows="2" placeholder="İsteğe bağlı açıklama..." class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 bg-white resize-none transition-all"></textarea>
             </div>
 
-            <!-- Kaydet Butonu -->
             <button type="button" onclick="formKontrol()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl shadow-md transition-all mt-4 text-lg">
                 KONTROLÜ KAYDET
             </button>
-            
         </form>
     </div>
-
 </body>
 </html>

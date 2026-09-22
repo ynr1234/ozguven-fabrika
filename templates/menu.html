@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Özgüven Kablo - Üretim Portalı</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4 font-sans">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 text-center">
+        <h1 class="text-3xl font-black text-slate-800 mb-2 tracking-wide">ÖZGÜVEN KABLO</h1>
+        <p class="text-slate-500 mb-8 font-medium">Lütfen işlem yapmak istediğiniz portalı seçin</p>
+        
+        <div class="grid grid-cols-1 gap-4">
+            <a href="/mesai" class="flex items-center justify-between p-6 bg-slate-50 hover:bg-emerald-50 border-2 border-slate-200 hover:border-emerald-500 rounded-xl transition-all group">
+                <div class="text-left">
+                    <h2 class="text-xl font-bold text-slate-800 group-hover:text-emerald-700">📅 Pazar Mesaisi Formu</h2>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Haftalık mesai katılım bildirimi ekranı</p>
+                </div>
+                <span class="text-2xl text-slate-400 group-hover:text-emerald-500">➔</span>
+            </a>
+            
+            <a href="/kontrol" class="flex items-center justify-between p-6 bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-500 rounded-xl transition-all group">
+                <div class="text-left">
+                    <h2 class="text-xl font-bold text-slate-800 group-hover:text-blue-700">🛑 Acil Stop & Switch Formu</h2>
+                    <p class="text-xs text-slate-500 mt-1 font-medium">Makine güvenlik ekipmanı kontrol ekranı</p>
+                </div>
+                <span class="text-2xl text-slate-400 group-hover:text-blue-500">➔</span>
+            </a>
+        </div>
+        
+        <div class="mt-8 pt-4 border-t border-slate-100 text-xs text-slate-400 font-semibold">
+            <a href="/admin" class="hover:text-slate-600 transition">Yönetici Paneli (Admin)</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -29,7 +29,7 @@ class MesaiKayit(Base):
     mazeret = Column(String(255), nullable=True)
     guncelleme_zamani = Column(DateTime, default=datetime.utcnow)
 
-# --- TABLO 2: ACİL STOP VE SWITCH KONTROLÜ (YENİ) ---
+# --- TABLO 2: ACİL STOP VE SWITCH KONTROLÜ ---
 class StopSwitchKayit(Base):
     __tablename__ = "stop_switch_kayitlari"
 
@@ -45,15 +45,12 @@ class StopSwitchKayit(Base):
     aciklama = Column(String(255), nullable=True)
     kayit_zamani = Column(DateTime, default=datetime.utcnow)
 
-# Veritabanını güncelle/oluştur
-# Geliştirme aşamasındaki tablo çakışmalarını önlemek için checkfirst=True ile oluşturuyoruz
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Özgüven Kablo - Üretim & Kontrol Sistemleri")
 templates = Jinja2Templates(directory="templates")
 
 PERSONEL_ISIMLERI = list(PERSONEL_DB.keys())
-
 MAKINE_LISTESI = [
     "BAKIR 07", "BETA", "DOMEKS 1", "DOMEKS 2", "DRUM1", "DRUM2", "EFAF",
     "EXTRUDER 1", "EXTRUDER 10", "EXTRUDER 11", "EXTRUDER 2", "EXTRUDER 3",
@@ -71,15 +68,26 @@ def get_db():
         db.close()
 
 # ==========================================
-# 1. MODÜL: PAZAR MESAİSİ
+# 0. ANA MENÜ (LANDING PAGE)
 # ==========================================
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def ana_menu(request: Request):
+    return templates.TemplateResponse(request=request, name="menu.html", context={})
+
+# ==========================================
+# 1. MODÜL: PAZAR MESAİSİ
+# ==========================================
+@app.get("/mesai", response_class=HTMLResponse)
+async def mesai_formu(request: Request):
     return templates.TemplateResponse(
         request=request, 
-        name="index.html", 
+        name="mesai.html", 
         context={"mesaj": None, "personeller": PERSONEL_ISIMLERI}
     )
+
+@app.get("/bildir", response_class=RedirectResponse)
+async def bildirim_yanlis_giris():
+    return RedirectResponse(url="/mesai", status_code=303)
 
 @app.post("/bildir", response_class=HTMLResponse)
 async def bildirim_yap(
@@ -94,15 +102,15 @@ async def bildirim_yap(
     girilen_sicil = girilen_sicil.strip()
     
     if ad_soyad not in PERSONEL_DB:
-        return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": "Personel bulunamadı.", "hata": True, "personeller": PERSONEL_ISIMLERI})
+        return templates.TemplateResponse(request=request, name="mesai.html", context={"mesaj": "Personel bulunamadı.", "hata": True, "personeller": PERSONEL_ISIMLERI})
     
     gercek_personel = PERSONEL_DB[ad_soyad]
     
     if gercek_personel["sicil_no"] != girilen_sicil:
-        return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": "Hatalı Sicil Numarası.", "hata": True, "personeller": PERSONEL_ISIMLERI})
+        return templates.TemplateResponse(request=request, name="mesai.html", context={"mesaj": "Hatalı Sicil Numarası.", "hata": True, "personeller": PERSONEL_ISIMLERI})
         
     if durum == "GELMİYOR" and (not mazeret or not mazeret.strip()):
-        return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": "Mazeret zorunludur.", "hata": True, "personeller": PERSONEL_ISIMLERI})
+        return templates.TemplateResponse(request=request, name="mesai.html", context={"mesaj": "Mazeret zorunludur.", "hata": True, "personeller": PERSONEL_ISIMLERI})
 
     gercek_sicil = gercek_personel["sicil_no"]
     mevcut_kayit = db.query(MesaiKayit).filter(MesaiKayit.sicil_no == gercek_sicil).first()
@@ -123,7 +131,7 @@ async def bildirim_yap(
     
     db.commit()
     
-    return templates.TemplateResponse(request=request, name="index.html", context={"mesaj": f"Başarılı: {durum}", "hata": False, "durum": durum, "personeller": PERSONEL_ISIMLERI})
+    return templates.TemplateResponse(request=request, name="mesai.html", context={"mesaj": f"Başarılı: {durum}", "hata": False, "durum": durum, "personeller": PERSONEL_ISIMLERI})
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_paneli(request: Request, db: Session = Depends(get_db)):
@@ -152,6 +160,10 @@ async def kontrol_formu(request: Request):
         context={"mesaj": None, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": bugun}
     )
 
+@app.get("/kontrol/bildir", response_class=RedirectResponse)
+async def kontrol_yanlis_giris():
+    return RedirectResponse(url="/kontrol", status_code=303)
+
 @app.post("/kontrol/bildir", response_class=HTMLResponse)
 async def kontrol_kaydet(
     request: Request,
@@ -169,49 +181,36 @@ async def kontrol_kaydet(
     ad_soyad = ad_soyad.strip()
     girilen_sicil = girilen_sicil.strip()
     
-    # Personel Doğrulama
     if ad_soyad not in PERSONEL_DB or PERSONEL_DB[ad_soyad]["sicil_no"] != girilen_sicil:
         return templates.TemplateResponse(
             request=request, name="kontrol.html", 
             context={"mesaj": "Hatalı Sicil Numarası veya Personel.", "hata": True, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": tarih}
         )
     
-    # Uygun değilse açıklama zorunluluğu
     if durum == "Uygun Değil" and (not aciklama or not aciklama.strip()):
          return templates.TemplateResponse(
             request=request, name="kontrol.html", 
             context={"mesaj": "Uygunsuzluk durumunda açıklama yazmak zorunludur.", "hata": True, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": tarih}
         )
 
-    # Boolean dönüşümleri
     is_acil_stop = acil_stop_val == "1"
     is_switch = switch_val == "1"
     
-    # Mesai formunun aksine, bu bir LOG (Kayıt) tablosudur. Üzerine yazmaz (Upsert yapmaz), alt alta ekler.
     yeni_kayit = StopSwitchKayit(
-        tarih=tarih,
-        vardiya=vardiya,
-        makine=makine,
-        sicil_no=PERSONEL_DB[ad_soyad]["sicil_no"],
-        ad_soyad=ad_soyad,
-        acil_stop=is_acil_stop,
-        switch=is_switch,
-        durum=durum,
-        aciklama=aciklama
+        tarih=tarih, vardiya=vardiya, makine=makine, sicil_no=PERSONEL_DB[ad_soyad]["sicil_no"],
+        ad_soyad=ad_soyad, acil_stop=is_acil_stop, switch=is_switch, durum=durum, aciklama=aciklama
     )
     
     db.add(yeni_kayit)
     db.commit()
     
-    bilgi = f"{makine} kontrolünüz başarıyla kaydedildi."
     return templates.TemplateResponse(
         request=request, name="kontrol.html", 
-        context={"mesaj": bilgi, "hata": False, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": tarih}
+        context={"mesaj": f"{makine} kontrolünüz başarıyla kaydedildi.", "hata": False, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": tarih}
     )
 
 @app.get("/admin/kontrol", response_class=HTMLResponse)
 async def admin_kontrol_paneli(request: Request, db: Session = Depends(get_db)):
-    # En son kaydedilen en üstte görünsün
     kayitlar = db.query(StopSwitchKayit).order_by(StopSwitchKayit.kayit_zamani.desc()).all()
     return templates.TemplateResponse(
         request=request, name="admin_kontrol.html", 
