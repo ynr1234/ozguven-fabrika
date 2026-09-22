@@ -46,10 +46,8 @@
         function formKontrol() {
             var ad_soyad = document.getElementById('ad_soyad').value;
             var sicil_no = document.getElementById('girilen_sicil').value;
-            var vardiya = document.getElementById('vardiya').value;
             var mazeret = document.getElementById('aciklama').value;
 
-            if (!vardiya) { alert("Lütfen vardiya seçiniz."); return; }
             if (!ad_soyad) { alert("Lütfen isminizi seçiniz."); return; }
             if (!sicil_no) { alert("Lütfen sicil numaranızı giriniz."); return; }
             if (!acilStopSecili && !switchSecili) {
@@ -96,20 +94,9 @@
             <input type="hidden" id="switch_val" name="switch_val" value="0">
             <input type="hidden" id="durum_val" name="durum" value="">
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tarih</label>
-                    <input type="date" name="tarih" value="{{ bugun }}" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Vardiya</label>
-                    <select name="vardiya" id="vardiya" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium bg-white">
-                        <option value="" disabled selected>Seçiniz...</option>
-                        <option value="08:00 - 16:00">08:00 - 16:00</option>
-                        <option value="16:00 - 00:00">16:00 - 00:00</option>
-                        <option value="00:00 - 08:00">00:00 - 08:00</option>
-                    </select>
-                </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tarih</label>
+                <input type="date" name="tarih" value="{{ bugun }}" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 font-medium">
             </div>
 
             <div>

@@ -35,7 +35,6 @@ class StopSwitchKayit(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tarih = Column(String(20))
-    vardiya = Column(String(50))
     makine = Column(String(100))
     sicil_no = Column(String(50))
     ad_soyad = Column(String(100))
@@ -168,7 +167,6 @@ async def kontrol_yanlis_giris():
 async def kontrol_kaydet(
     request: Request,
     tarih: str = Form(...),
-    vardiya: str = Form(...),
     makine: str = Form(...),
     ad_soyad: str = Form(...),
     girilen_sicil: str = Form(...),
@@ -197,7 +195,7 @@ async def kontrol_kaydet(
     is_switch = switch_val == "1"
     
     yeni_kayit = StopSwitchKayit(
-        tarih=tarih, vardiya=vardiya, makine=makine, sicil_no=PERSONEL_DB[ad_soyad]["sicil_no"],
+        tarih=tarih, makine=makine, sicil_no=PERSONEL_DB[ad_soyad]["sicil_no"],
         ad_soyad=ad_soyad, acil_stop=is_acil_stop, switch=is_switch, durum=durum, aciklama=aciklama
     )
     

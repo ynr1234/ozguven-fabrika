@@ -20,7 +20,6 @@
 
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-slate-800">Acil Stop & Switch Geçmiş Kayıtları</h2>
-            <!-- İleride Excel dışa aktarım butonu konulabilir -->
         </div>
 
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
@@ -29,7 +28,6 @@
                     <tr>
                         <th class="p-3">Kayıt Zamanı</th>
                         <th class="p-3">Tarih</th>
-                        <th class="p-3">Vardiya</th>
                         <th class="p-3">Makine</th>
                         <th class="p-3">Personel</th>
                         <th class="p-3">Kontrol Edilenler</th>
@@ -42,7 +40,6 @@
                     <tr class="hover:bg-slate-50">
                         <td class="p-3 text-xs text-slate-400">{{ k.kayit_zamani.strftime('%d.%m %H:%M') }}</td>
                         <td class="p-3 font-medium text-slate-700">{{ k.tarih }}</td>
-                        <td class="p-3 text-slate-600">{{ k.vardiya }}</td>
                         <td class="p-3 font-bold text-slate-800">{{ k.makine }}</td>
                         <td class="p-3 font-medium text-slate-700">{{ k.ad_soyad }}</td>
                         <td class="p-3">
