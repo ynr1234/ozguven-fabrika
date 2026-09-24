@@ -1,9 +1,4 @@
 PERSONEL_DB = {
-    "1HURDA GİRİŞİ": {
-        "sicil_no": "0316",
-        "unvan": "-",
-        "departman": "YARDIMCI PERSONEL"
-    },
     "ABDULLAH ACUN": {
         "sicil_no": "0289",
         "unvan": "Damar Büküm Operatörü",
