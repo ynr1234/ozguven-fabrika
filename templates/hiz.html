@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canlı Hat Hızı Takibi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="w-full max-w-lg text-left">
+        <a href="/" class="mb-4 inline-flex items-center text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200">
+            <span class="mr-2 text-lg leading-none">🔙</span> Ana Menüye Dön
+        </a>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200">
+        <div class="text-center border-b-2 border-slate-100 pb-4 mb-5">
+            <h1 class="text-2xl font-black text-slate-800 tracking-wide">ÖZGÜVEN KABLO</h1>
+            <h2 class="text-lg font-bold text-amber-600 mt-1">⚡ Canlı Hat Hızı Takip Formu</h2>
+        </div>
+
+        {% if mesaj %}
+        <div class="mb-5 p-3 rounded-lg text-center font-semibold text-sm 
+            {% if hata %} bg-rose-100 text-rose-800 border border-rose-300
+            {% else %} bg-emerald-100 text-emerald-800 border border-emerald-300 {% endif %}">
+            {{ mesaj }}
+        </div>
+        {% endif %}
+
+        {% if katalog|length == 0 %}
+        <div class="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-sm">
+            <strong>⚠️ Henüz Kablo/Hız Kataloğu Yüklenmemiş!</strong><br>
+            Lütfen önce <a href="/admin/hiz" class="underline font-bold">Admin Hız Paneli</a> sayfasına giderek Excel dosyanızı sisteme yükleyin.
+        </div>
+        {% endif %}
+
+        <form id="hizForm" action="/hiz/bildir" method="POST" class="space-y-4">
+            <input type="hidden" name="mamul_adi" id="secilen_mamul" required>
+            <input type="hidden" name="sistem_hizi" id="secilen_sistem_hizi" required>
+
+            <!-- 1. MAKİNE SEÇİMİ -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">1. Makine Seçimi</label>
+                <select name="makine" id="makine_select" onchange="makineDegisti()" required class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 font-bold bg-slate-50">
+                    <option value="" disabled selected>Makine seçiniz...</option>
+                </select>
+            </div>
+
+            <!-- 2. OPERASYON SEÇİMİ -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">2. Operasyon Seçimi</label>
+                <select name="operasyon" id="operasyon_select" onchange="operasyonDegisti()" required disabled class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 font-semibold bg-white disabled:bg-slate-100 disabled:text-slate-400">
+                    <option value="" disabled selected>Önce makine seçiniz...</option>
+                </select>
+            </div>
+
+            <!-- 3. AKILLI KABLO ARAMA VE FİLTRELEME -->
+            <div id="kablo_bolumu" class="opacity-50 pointer-events-none transition-opacity">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">3. Kablo (Mamül) Seçimi</label>
+                
+                <div class="relative mb-2">
+                    <input type="text" id="kablo_ara" oninput="kablolariFiltrele()" placeholder="Filtrele: örn. 3x2,5 veya pvc hffr xlpe..." class="w-full px-4 py-3 rounded-lg border-2 border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 text-sm bg-amber-50/30 font-medium">
+                    <span id="kablo_sayac" class="absolute right-3 top-3.5 text-xs font-bold text-slate-400">0 ürün</span>
+                </div>
+
+                <!-- Filtrelenen Kablo Listesi -->
+                <div id="kablo_listesi" class="max-h-52 overflow-y-auto border border-slate-300 rounded-lg divide-y divide-slate-100 bg-white shadow-inner">
+                    <div class="p-3 text-xs text-slate-400 text-center">Makine ve operasyon seçtiğinizde kablolar burada listelenir.</div>
+                </div>
+            </div>
+
+            <!-- SEÇİLEN KABLO VE SİSTEM HIZI GÖSTERGESİ -->
+            <div id="secim_ozeti" style="display: none;" class="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
+                <div class="text-xs font-bold text-blue-500 uppercase">Seçilen Mamül</div>
+                <div id="ozet_mamul_adi" class="text-sm font-black text-slate-800 mt-0.5 break-words">-</div>
+                <div class="mt-3 pt-3 border-t border-blue-200 flex items-center justify-between">
+                    <span class="text-xs font-bold text-blue-700 uppercase">Sistemde Görünen Hız:</span>
+                    <span id="ozet_sistem_hizi" class="text-xl font-black text-blue-700 bg-white px-3 py-1 rounded-lg border border-blue-300 shadow-sm">-</span>
+                </div>
+            </div>
+
+            <!-- 4. SAHADAKİ HIZ GİRİŞİ -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">4. Sahadaki Mevcut Hız</label>
+                <input type="text" inputmode="decimal" name="sahadaki_hiz" id="sahadaki_hiz" required placeholder="Örn: 115 veya 85.5" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 text-lg font-black">
+            </div>
+
+            <!-- 5. AÇIKLAMA -->
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">5. Açıklama / Not (İsteğe Bağlı)</label>
+                <textarea name="aciklama" rows="2" placeholder="Varsa hız düşüklüğü sebebi, arıza veya notunuz..." class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-700 text-sm bg-white resize-none"></textarea>
+            </div>
+
+            <button type="button" onclick="formGonder()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-xl shadow-md transition-all active:scale-95 text-lg">
+                HIZI KAYDET
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // Backend'den gelen tüm katalog verisi
+        const KATALOG = {{ katalog | tojson | safe }};
+        let aktifKablolar = [];
+
+        // Türkçe karakter ve nokta/virgül duyarsızlaştırma (3x2,5 == 3x2.5)
+        function normalizeMetin(str) {
+            if (!str) return "";
+            return str.toString()
+                .toLocaleLowerCase('tr-TR')
+                .replace(/,/g, '.')
+                .replace(/ı/g, 'i')
+                .replace(/ğ/g, 'g')
+                .replace(/ü/g, 'u')
+                .replace(/ş/g, 's')
+                .replace(/ö/g, 'o')
+                .replace(/ç/g, 'c');
+        }
+
+        // Sayfa yüklendiğinde benzersiz makineleri doldur
+        window.addEventListener('DOMContentLoaded', () => {
+            const makineSelect = document.getElementById('makine_select');
+            const makineler = [...new Set(KATALOG.map(item => item.makine))].sort((a, b) => a.localeCompare(b, 'tr'));
+            
+            makineler.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                makineSelect.appendChild(opt);
+            });
+        });
+
+        function makineDegisti() {
+            const secilenMakine = document.getElementById('makine_select').value;
+            const opSelect = document.getElementById('operasyon_select');
+            opSelect.innerHTML = '<option value="" disabled selected>Operasyon seçiniz...</option>';
+            opSelect.disabled = false;
+
+            // Sadece bu makineye ait operasyonları bul
+            const operasyonlar = [...new Set(
+                KATALOG.filter(item => item.makine === secilenMakine).map(item => item.operasyon)
+            )].sort((a, b) => a.localeCompare(b, 'tr'));
+
+            operasyonlar.forEach(op => {
+                const opt = document.createElement('option');
+                opt.value = op;
+                opt.textContent = op;
+                opSelect.appendChild(opt);
+            });
+
+            secimiSifirla();
+
+            // Eğer makinenin tek bir operasyonu varsa kullanıcıyı yormadan otomatik seç
+            if (operasyonlar.length === 1) {
+                opSelect.value = operasyonlar[0];
+                operasyonDegisti();
+            }
+        }
+
+        function operasyonDegisti() {
+            const secilenMakine = document.getElementById('makine_select').value;
+            const secilenOp = document.getElementById('operasyon_select').value;
+
+            aktifKablolar = KATALOG.filter(item => item.makine === secilenMakine && item.operasyon === secilenOp);
+            
+            document.getElementById('kablo_bolumu').classList.remove('opacity-50', 'pointer-events-none');
+            document.getElementById('kablo_ara').value = '';
+            secimiSifirla();
+            kablolariFiltrele();
+        }
+
+        function kablolariFiltrele() {
+            const aramaMetni = normalizeMetin(document.getElementById('kablo_ara').value.trim());
+            const kelimeler = aramaMetni.split(/\s+/).filter(Boolean);
+
+            const filtrelenmis = aktifKablolar.filter(item => {
+                const normMamul = normalizeMetin(item.mamul);
+                // Yazılan her bir kelimenin mamül adında geçmesi şartı (sıra bağımsız)
+                return kelimeler.every(kelime => normMamul.includes(kelime));
+            });
+
+            document.getElementById('kablo_sayac').textContent = filtrelenmis.length + " ürün";
+            const listeDiv = document.getElementById('kablo_listesi');
+            listeDiv.innerHTML = '';
+
+            if (filtrelenmis.length === 0) {
+                listeDiv.innerHTML = '<div class="p-3 text-xs text-rose-500 text-center font-semibold">Eşleşen kablo bulunamadı.</div>';
+                return;
+            }
+
+            // Performans için ilk 150 eşleşmeyi göster
+            filtrelenmis.slice(0, 150).forEach(item => {
+                const satir = document.createElement('button');
+                satir.type = 'button';
+                satir.className = 'w-full text-left p-3 hover:bg-amber-50 focus:bg-amber-100 transition flex items-center justify-between gap-2 text-xs md:text-sm';
+                satir.innerHTML = `
+                    <span class="font-semibold text-slate-700 break-words">${item.mamul}</span>
+                    <span class="shrink-0 px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-bold">${item.hiz}</span>
+                `;
+                satir.onclick = () => kabloSec(item.mamul, item.hiz);
+                listeDiv.appendChild(satir);
+            });
+        }
+
+        function kabloSec(mamul, hiz) {
+            document.getElementById('secilen_mamul').value = mamul;
+            document.getElementById('secilen_sistem_hizi').value = hiz;
+
+            document.getElementById('ozet_mamul_adi').textContent = mamul;
+            document.getElementById('ozet_sistem_hizi').textContent = hiz;
+            document.getElementById('secim_ozeti').style.display = 'block';
+
+            // Hız giriş kutusuna otomatik odaklan
+            document.getElementById('sahadaki_hiz').focus();
+        }
+
+        function secimiSifirla() {
+            document.getElementById('secilen_mamul').value = '';
+            document.getElementById('secilen_sistem_hizi').value = '';
+            document.getElementById('secim_ozeti').style.display = 'none';
+        }
+
+        function formGonder() {
+            const makine = document.getElementById('makine_select').value;
+            const op = document.getElementById('operasyon_select').value;
+            const mamul = document.getElementById('secilen_mamul').value;
+            const sahaHizi = document.getElementById('sahadaki_hiz').value.trim();
+
+            if (!makine || !op) {
+                alert("Lütfen makine ve operasyon seçiniz.");
+                return;
+            }
+            if (!mamul) {
+                alert("Lütfen listeden bir kablo (mamül) seçiniz.");
+                return;
+            }
+            if (!sahaHizi) {
+                alert("Lütfen sahadaki mevcut hızı giriniz.");
+                document.getElementById('sahadaki_hiz').focus();
+                return;
+            }
+            document.getElementById('hizForm').submit();
+        }
+    </script>
+</body>
+</html>
