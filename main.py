@@ -406,30 +406,52 @@ def admin_hiz_excel_indir(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Hat Hızı Kayıtları"
     
-    # Başlık satırı
-    headers = ["Kayıt ID", "Kayıt Zamanı", "Makine", "Operasyon", "Mamül (Kablo) Adı", "2 Yıllık Ort. Hız", "Sahadaki Hız", "Açıklama"]
+    # Başlıklar
+    headers = [
+        "Kayıt ID", "Kayıt Zamanı", "Makine", "Operasyon", 
+        "Mamül (Kablo) Adı", "2 Yıllık Ort. Hız", "Sahadaki Hız", "Açıklama"
+    ]
     ws.append(headers)
     
-    # Satırları ekle
+    # Sayıya güvenli dönüştürme fonksiyonu
+    def sayiya_cevir(val):
+        if val is None or str(val).strip() == "":
+            return ""
+        try:
+            val_clean = str(val).strip().replace(",", ".")
+            f = float(val_clean)
+            return int(f) if f.is_integer() else f
+        except (ValueError, TypeError):
+            return str(val).strip()
+
     for k in kayitlar:
-        zaman_str = k.kayit_zamani.strftime("%d.%m.%Y %H:%M") if k.kayit_zamani else "-"
-        ws.append([
+        # 1. Kayıt Zamanı: String yerine doğrudan saf datetime nesnesi aktarılıyor
+        zaman_degeri = k.kayit_zamani.replace(tzinfo=None) if k.kayit_zamani else ""
+        
+        # 2. Satır verileri ilgili tiplerle ekleniyor
+        satir = [
             k.id,
-            zaman_str,
-            k.makine or "",
-            k.operasyon or "",
-            k.mamul_adi or "",
-            k.sistem_hizi or "",
-            k.sahadaki_hiz or "",
-            k.aciklama or ""
-        ])
-    
-    # Belleğe yaz ve indirilebilir stream oluştur
+            zaman_degeri,
+            str(k.makine).strip() if k.makine else "",
+            str(k.operasyon).strip() if k.operasyon else "",
+            str(k.mamul_adi).strip() if k.mamul_adi else "",
+            sayiya_cevir(k.sistem_hizi),
+            sayiya_cevir(k.sahadaki_hiz),
+            str(k.aciklama).strip() if k.aciklama else ""
+        ]
+        ws.append(satir)
+        
+        # 3. Tarih sütununa (B sütunu) Excel'de 'GG.AA.YYYY SS:DD' görünüm biçimi veriliyor
+        if zaman_degeri != "":
+            ws.cell(row=ws.max_row, column=2).number_format = "DD.MM.YYYY HH:MM"
+
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
     
-    dosya_adi = f"hat_hizi_kayitlari_{get_turkey_time().strftime('%d_%m_%Y')}.xlsx"
+    bugun = get_turkey_time().strftime("%d_%m_%Y")
+    dosya_adi = f"hat_hizi_kayitlari_{bugun}.xlsx"
+    
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
