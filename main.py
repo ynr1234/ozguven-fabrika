@@ -3,7 +3,7 @@ import io
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, Request, Form, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -373,4 +373,42 @@ async def excel_katalog_yukle(
     return templates.TemplateResponse(
         request=request, name="admin_hiz.html",
         context={"kayitlar": kayitlar, "katalog_sayisi": katalog_sayisi, "yukleme_mesaji": mesaj}
+    )
+
+@app.get("/admin/hiz/excel-indir")
+def admin_hiz_excel_indir(db: Session = Depends(get_db)):
+    kayitlar = db.query(HatHiziKayit).order_by(HatHiziKayit.id.desc()).all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Hat Hızı Kayıtları"
+    
+    # Başlık satırı
+    headers = ["Kayıt ID", "Kayıt Zamanı", "Makine", "Operasyon", "Mamül (Kablo) Adı", "2 Yıllık Ort. Hız", "Sahadaki Hız", "Açıklama"]
+    ws.append(headers)
+    
+    # Satırları ekle
+    for k in kayitlar:
+        zaman_str = k.kayit_zamani.strftime("%d.%m.%Y %H:%M") if k.kayit_zamani else "-"
+        ws.append([
+            k.id,
+            zaman_str,
+            k.makine or "",
+            k.operasyon or "",
+            k.mamul_adi or "",
+            k.sistem_hizi or "",
+            k.sahadaki_hiz or "",
+            k.aciklama or ""
+        ])
+    
+    # Belleğe yaz ve indirilebilir stream oluştur
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    dosya_adi = f"hat_hizi_kayitlari_{datetime.now().strftime('%d_%m_%Y')}.xlsx"
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={dosya_adi}"}
     )
