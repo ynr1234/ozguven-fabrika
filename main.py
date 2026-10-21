@@ -1,14 +1,18 @@
 import os
 import io
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import FastAPI, Request, Form, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 import openpyxl
 from personel_data import PERSONEL_DB
+
+# --- ZAMAN DİLİMİ FONKSİYONU (UTC+3 TÜRKİYE SAATİ) ---
+def get_turkey_time():
+    return datetime.now(timezone(timedelta(hours=3))).replace(tzinfo=None)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./local_test.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -34,7 +38,7 @@ class MesaiKayit(Base):
     unvan = Column(String(100))
     durum = Column(String(20))
     mazeret = Column(String(255), nullable=True)
-    guncelleme_zamani = Column(DateTime, default=datetime.utcnow)
+    guncelleme_zamani = Column(DateTime, default=get_turkey_time)
 
 # --- TABLO 2: ACİL STOP VE SWITCH KONTROLÜ ---
 class StopSwitchKayit(Base):
@@ -49,7 +53,7 @@ class StopSwitchKayit(Base):
     switch = Column(Boolean, default=False)
     durum = Column(String(20))
     aciklama = Column(String(255), nullable=True)
-    kayit_zamani = Column(DateTime, default=datetime.utcnow)
+    kayit_zamani = Column(DateTime, default=get_turkey_time)
 
 # --- TABLO 3: EXCEL'DEN GELEN MAKİNE-OPERASYON-MAMÜL-SİSTEM HIZI KATALOĞU ---
 class HizKatalog(Base):
@@ -72,9 +76,26 @@ class HatHiziKayit(Base):
     sistem_hizi = Column(String(50))
     sahadaki_hiz = Column(String(50))
     aciklama = Column(String(255), nullable=True)
-    kayit_zamani = Column(DateTime, default=datetime.utcnow)
+    kayit_zamani = Column(DateTime, default=get_turkey_time)
 
 Base.metadata.create_all(bind=engine)
+
+# Otomatik Sequence Senkronizasyonu (ID çakışmalarını önler)
+if "postgresql" in DATABASE_URL:
+    try:
+        with engine.connect() as conn:
+            tablolar = ["hat_hizi_kayitlari", "hiz_katalogu", "mesai_kayitlari", "stop_switch_kayitlari"]
+            for tbl in tablolar:
+                conn.execute(text(f"""
+                    SELECT setval(
+                        pg_get_serial_sequence('{tbl}', 'id'),
+                        COALESCE((SELECT MAX(id) FROM {tbl}), 0) + 1,
+                        false
+                    );
+                """))
+            conn.commit()
+    except Exception as e:
+        print(f"Sequence sync bypassed: {e}")
 
 app = FastAPI(title="Özgüven Kablo - Üretim & Kontrol Sistemleri")
 templates = Jinja2Templates(directory="templates")
@@ -147,11 +168,12 @@ async def bildirim_yap(
         mevcut_kayit.unvan = gercek_personel["unvan"]
         mevcut_kayit.durum = durum
         mevcut_kayit.mazeret = mazeret
-        mevcut_kayit.guncelleme_zamani = datetime.utcnow()
+        mevcut_kayit.guncelleme_zamani = get_turkey_time()
     else:
         yeni_kayit = MesaiKayit(
             sicil_no=gercek_sicil, ad_soyad=ad_soyad, departman=gercek_personel["departman"],
-            unvan=gercek_personel["unvan"], durum=durum, mazeret=mazeret
+            unvan=gercek_personel["unvan"], durum=durum, mazeret=mazeret,
+            guncelleme_zamani=get_turkey_time()
         )
         db.add(yeni_kayit)
     
@@ -177,7 +199,7 @@ async def kayitlari_sifirla(db: Session = Depends(get_db)):
 # ==========================================
 @app.get("/kontrol", response_class=HTMLResponse)
 async def kontrol_formu(request: Request):
-    bugun = datetime.now().strftime("%Y-%m-%d")
+    bugun = get_turkey_time().strftime("%Y-%m-%d")
     return templates.TemplateResponse(
         request=request, name="kontrol.html", 
         context={"mesaj": None, "personeller": PERSONEL_ISIMLERI, "makineler": MAKINE_LISTESI, "bugun": bugun}
@@ -218,7 +240,8 @@ async def kontrol_kaydet(
     yeni_kayit = StopSwitchKayit(
         tarih=tarih, makine=makine, sicil_no=PERSONEL_DB[ad_soyad]["sicil_no"],
         ad_soyad=ad_soyad, acil_stop=(acil_stop_val == "1"), switch=(switch_val == "1"),
-        durum=durum, aciklama=aciklama
+        durum=durum, aciklama=aciklama,
+        kayit_zamani=get_turkey_time()
     )
     db.add(yeni_kayit)
     db.commit()
@@ -233,9 +256,8 @@ async def admin_kontrol_paneli(request: Request, db: Session = Depends(get_db)):
     kayitlar = db.query(StopSwitchKayit).order_by(StopSwitchKayit.kayit_zamani.desc()).all()
     return templates.TemplateResponse(request=request, name="admin_kontrol.html", context={"kayitlar": kayitlar})
 
-
 # ==========================================
-# 3. MODÜL: CANLI HAT HIZI TAKİBİ (YENİ)
+# 3. MODÜL: CANLI HAT HIZI TAKİBİ
 # ==========================================
 @app.get("/hiz", response_class=HTMLResponse)
 async def hiz_formu(request: Request, db: Session = Depends(get_db)):
@@ -275,7 +297,8 @@ async def hiz_kaydet(
         mamul_adi=mamul_adi.strip(),
         sistem_hizi=sistem_hizi.strip(),
         sahadaki_hiz=sahadaki_hiz.strip(),
-        aciklama=aciklama.strip() if aciklama else None
+        aciklama=aciklama.strip() if aciklama else None,
+        kayit_zamani=get_turkey_time()  # Doğrudan Türkiye Saati (UTC+3) ile kaydedilir
     )
     db.add(yeni_hiz)
     db.commit()
@@ -332,7 +355,7 @@ async def excel_katalog_yukle(
             raw_mamul = row[mamul_sutun - 1]
             raw_hiz = row[hiz_sutun - 1]
 
-            # Pivot tablolarda üstteki hücre tekrar etmiyorsa (boşsa) bir önceki değeri koru (Forward Fill)
+            # Pivot tablolarda üstteki hücre tekrar etmiyorsa bir önceki değeri koru (Forward Fill)
             if raw_makine is not None and str(raw_makine).strip() != "":
                 son_makine = str(raw_makine).strip()
             if raw_operasyon is not None and str(raw_operasyon).strip() != "":
@@ -347,7 +370,7 @@ async def excel_katalog_yukle(
                 if "toplam" in mamul_str.lower():
                     continue
                 
-                # Sayısal hızları temiz formatla (Örn: 120.456 -> 120.5)
+                # Sayısal hızları temiz formatla (Örn: 120.456 -> 120.46)
                 try:
                     hiz_float = float(raw_hiz)
                     hiz_str = f"{hiz_float:.2f}".rstrip('0').rstrip('.')
@@ -406,7 +429,7 @@ def admin_hiz_excel_indir(db: Session = Depends(get_db)):
     wb.save(stream)
     stream.seek(0)
     
-    dosya_adi = f"hat_hizi_kayitlari_{datetime.now().strftime('%d_%m_%Y')}.xlsx"
+    dosya_adi = f"hat_hizi_kayitlari_{get_turkey_time().strftime('%d_%m_%Y')}.xlsx"
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
