@@ -19,55 +19,71 @@
             </div>
         </div>
 
-        <!-- EXCEL KATALOG YÜKLEME KUTUSU -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm mb-6">
-            <div class="flex flex-wrap justify-between items-center mb-3">
-                <div>
-                    <h2 class="text-base font-bold text-slate-800">📂 Excel (Pivot) Hız Kataloğu Yükle / Güncelle</h2>
-                    <p class="text-xs text-slate-500">Şu an veritabanında <strong>{{ katalog_sayisi }}</strong> adet Makine-Operasyon-Mamül hız eşleşmesi kayıtlı.</p>
+        <!-- AÇILIR / KAPANIR EXCEL KATALOG YÜKLEME KUTUSU (VARSAYILAN: KAPALI) -->
+        <details class="group bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
+            <summary class="flex justify-between items-center p-4 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 transition">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg">📁</span>
+                    <div>
+                        <h2 class="text-sm font-bold text-slate-800">Excel (Pivot) Hız Kataloğu Yükle / Güncelle</h2>
+                        <p class="text-xs text-slate-500">Şu an veritabanında <strong>{{ katalog_sayisi or 0 }}</strong> adet kayıtlı. Yanlışlıkla işlem yapılmaması için gizlenmiştir, açmak için tıklayın.</p>
+                    </div>
                 </div>
-                <a href="/hiz" class="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-2 rounded-lg hover:bg-amber-200 transition">👉 Sahadaki Hız Giriş Formuna Git</a>
-            </div>
+                <div class="flex items-center gap-3">
+                    <a href="/hiz" class="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg hover:bg-amber-200 transition" onclick="event.stopPropagation();">👉 Hız Formuna Git</a>
+                    <span class="text-xs font-semibold text-slate-400 group-open:rotate-180 transition-transform duration-200">▼</span>
+                </div>
+            </summary>
 
-            {% if yukleme_mesaji %}
-            <div class="mb-4 p-3 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-                {{ yukleme_mesaji }}
-            </div>
-            {% endif %}
+            <div class="p-5 border-t border-slate-100">
+                {% if yukleme_mesaji %}
+                <div class="mb-4 p-3 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                    {{ yukleme_mesaji }}
+                </div>
+                {% endif %}
 
-            <form action="/admin/hiz/excel-yukle" method="POST" enctype="multipart/form-data" class="grid grid-cols-2 md:grid-cols-7 gap-3 items-end pt-2 border-t border-slate-100">
-                <div class="col-span-2">
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Excel Dosyası (.xlsx)</label>
-                    <input type="file" name="excel_dosyasi" accept=".xlsx" required class="w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-white hover:file:bg-slate-700">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Makine Sütun No</label>
-                    <input type="number" name="makine_sutun" value="1" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Operasyon Sütun</label>
-                    <input type="number" name="operasyon_sutun" value="2" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Mamül Sütun No</label>
-                    <input type="number" name="mamul_sutun" value="3" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Hız Sütun No</label>
-                    <input type="number" name="hiz_sutun" value="4" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
-                </div>
-                <div>
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm transition">
-                        Excel'i Yükle
-                    </button>
-                </div>
-            </form>
-            <p class="text-[11px] text-slate-400 mt-2">* Not: Excel'inizde A sütunu=1, B sütunu=2, C sütunu=3, D sütunu=4 anlamına gelir. Sütun sıranız farklıysa numaraları değiştirip yükleyebilirsiniz.</p>
+                <form action="/admin/hiz/excel-yukle" method="POST" enctype="multipart/form-data" class="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Excel Dosyası (.xlsx)</label>
+                        <input type="file" name="excel_dosyasi" accept=".xlsx" required class="w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-white hover:file:bg-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Makine Sütun</label>
+                        <input type="number" name="makine_sutun" value="1" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Operasyon Sütun</label>
+                        <input type="number" name="operasyon_sutun" value="2" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Mamül Sütun</label>
+                        <input type="number" name="mamul_sutun" value="3" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Hız Sütun</label>
+                        <input type="number" name="hiz_sutun" value="4" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm transition">
+                            Excel'i Yükle
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        <!-- BAŞLIK VE EXCEL İNDİRME BUTONU -->
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+            <h2 class="text-2xl font-bold text-slate-800">Sahadan Girilen Hat Hızı Kayıtları</h2>
+            <a href="/admin/hiz/excel-indir" class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 px-5 rounded-lg text-sm shadow-sm transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Excel Olarak İndir
+            </a>
         </div>
 
         <!-- KAYITLAR TABLOSU -->
-        <h2 class="text-2xl font-bold text-slate-800 mb-4">Sahadan Girilen Hat Hızı Kayıtları</h2>
-
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
             <table class="w-full text-left border-collapse min-w-[900px]">
                 <thead class="bg-slate-100 text-xs font-semibold text-slate-600 uppercase">
@@ -76,7 +92,7 @@
                         <th class="p-3">Makine</th>
                         <th class="p-3">Operasyon</th>
                         <th class="p-3">Mamül (Kablo) Adı</th>
-                        <th class="p-3">Sistemdeki Hız</th>
+                        <th class="p-3">2 Yıllık Ort. Hız</th>
                         <th class="p-3">Sahadaki Hız</th>
                         <th class="p-3 w-1/4">Açıklama</th>
                     </tr>
@@ -84,10 +100,9 @@
                 <tbody class="text-sm divide-y divide-slate-100">
                     {% for k in kayitlar %}
                     <tr class="hover:bg-slate-50">
-                    
                         <td class="p-3 text-xs text-slate-400">
-    {{ k.kayit_zamani.strftime('%d.%m.%Y %H:%M') if k.kayit_zamani else '-' }}
-</td>
+                            {{ k.kayit_zamani.strftime('%d.%m.%Y %H:%M') if k.kayit_zamani else '-' }}
+                        </td>
                         <td class="p-3 font-bold text-slate-800">{{ k.makine }}</td>
                         <td class="p-3 text-slate-600">{{ k.operasyon }}</td>
                         <td class="p-3 font-medium text-slate-800">{{ k.mamul_adi }}</td>
@@ -98,6 +113,10 @@
                             </span>
                         </td>
                         <td class="p-3 text-slate-600 text-xs">{{ k.aciklama or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="p-4 text-center text-slate-400 text-sm">Henüz sahadan girilmiş bir hız kaydı bulunmuyor.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
