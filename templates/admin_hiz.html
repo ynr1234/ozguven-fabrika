@@ -84,7 +84,10 @@
                 <tbody class="text-sm divide-y divide-slate-100">
                     {% for k in kayitlar %}
                     <tr class="hover:bg-slate-50">
-                        <td class="p-3 text-xs text-slate-400">{{ k.kayit_zamani.strftime('%d.%m.%Y %H:%M') }}</td>
+                    
+                        <td class="p-3 text-xs text-slate-400">
+    {{ k.kayit_zamani.strftime('%d.%m.%Y %H:%M') if k.kayit_zamani else '-' }}
+</td>
                         <td class="p-3 font-bold text-slate-800">{{ k.makine }}</td>
                         <td class="p-3 text-slate-600">{{ k.operasyon }}</td>
                         <td class="p-3 font-medium text-slate-800">{{ k.mamul_adi }}</td>
