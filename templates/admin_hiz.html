@@ -19,14 +19,20 @@
             </div>
         </div>
 
-        <!-- AÇILIR / KAPANIR EXCEL KATALOG YÜKLEME KUTUSU (VARSAYILAN: KAPALI) -->
-        <details class="group bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
-            <summary class="flex justify-between items-center p-4 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 transition">
+        {% if yukleme_mesaji %}
+        <div class="mb-6 p-4 rounded-xl text-sm font-bold {{ 'bg-red-50 text-red-800 border border-red-200' if 'Hata' in yukleme_mesaji else 'bg-emerald-50 text-emerald-800 border border-emerald-200' }}">
+            {{ yukleme_mesaji }}
+        </div>
+        {% endif %}
+
+        <!-- 1. AÇILIR/KAPANIR KUTU: ERP ROTA HIZLARI (11 DOSYA TOPLU YÜKLEME) -->
+        <details class="group bg-white rounded-xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+            <summary class="flex justify-between items-center p-4 cursor-pointer select-none bg-blue-50/50 hover:bg-blue-50 transition">
                 <div class="flex items-center gap-3">
-                    <span class="text-lg">📁</span>
+                    <span class="text-lg">🏭</span>
                     <div>
-                        <h2 class="text-sm font-bold text-slate-800">Excel (Pivot) Hız Kataloğu Yükle / Güncelle</h2>
-                        <p class="text-xs text-slate-500">Şu an veritabanında <strong>{{ katalog_sayisi or 0 }}</strong> adet kayıtlı. Yanlışlıkla işlem yapılmaması için gizlenmiştir, açmak için tıklayın.</p>
+                        <h2 class="text-sm font-bold text-slate-800">ERP Rota Hızları Yükle (11 Makine Dosyası Toplu Seçim)</h2>
+                        <p class="text-xs text-slate-500">Şu an <strong>{{ erp_sayisi or 0 }}</strong> üründe ERP rota hızı tanımlı. Dosya adları (EXT1.xlsx ... EXT11.xlsx) makine kodu olarak okunur.</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
@@ -36,15 +42,49 @@
             </summary>
 
             <div class="p-5 border-t border-slate-100">
-                {% if yukleme_mesaji %}
-                <div class="mb-4 p-3 rounded-lg text-sm font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-                    {{ yukleme_mesaji }}
-                </div>
-                {% endif %}
+                <form action="/admin/hiz/erp-yukle" method="POST" enctype="multipart/form-data" class="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">ERP Excel Dosyaları (Ctrl+A ile 11 dosyayı seçin)</label>
+                        <input type="file" name="erp_dosyalari" accept=".xlsx,.xlsm" multiple required class="w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-700 file:text-white hover:file:bg-blue-800">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Operasyon Sütun (F=6)</label>
+                        <input type="number" name="operasyon_sutun" value="6" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Mamül Adı Sütun (N=14)</label>
+                        <input type="number" name="mamul_sutun" value="14" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Hız Sütun (K=11)</label>
+                        <input type="number" name="hiz_sutun" value="11" min="1" required class="w-full px-3 py-2 rounded border border-slate-300 text-sm font-bold">
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm transition">
+                            ERP Dosyalarını Yükle
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </details>
 
+        <!-- 2. AÇILIR/KAPANIR KUTU: 2 YILLIK PİVOT HIZ KATALOĞU -->
+        <details class="group bg-white rounded-xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
+            <summary class="flex justify-between items-center p-4 cursor-pointer select-none bg-slate-50 hover:bg-slate-100 transition">
+                <div class="flex items-center gap-3">
+                    <span class="text-lg">📁</span>
+                    <div>
+                        <h2 class="text-sm font-bold text-slate-800">2 Yıllık Ort. Hız Kataloğu Yükle / Güncelle (Pivot Excel)</h2>
+                        <p class="text-xs text-slate-500">Toplam <strong>{{ katalog_sayisi or 0 }}</strong> kayıt mevcut. Yanlışlıkla işlem yapılmaması için gizlenmiştir, açmak için tıklayın.</p>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold text-slate-400 group-open:rotate-180 transition-transform duration-200">▼</span>
+            </summary>
+
+            <div class="p-5 border-t border-slate-100">
                 <form action="/admin/hiz/excel-yukle" method="POST" enctype="multipart/form-data" class="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
                     <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Excel Dosyası (.xlsx)</label>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Pivot Excel Dosyası (.xlsx)</label>
                         <input type="file" name="excel_dosyasi" accept=".xlsx" required class="w-full text-xs text-slate-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-white hover:file:bg-slate-700">
                     </div>
                     <div>
@@ -65,7 +105,7 @@
                     </div>
                     <div>
                         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm transition">
-                            Excel'i Yükle
+                            Pivotu Yükle
                         </button>
                     </div>
                 </form>
@@ -85,16 +125,18 @@
 
         <!-- KAYITLAR TABLOSU -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-            <table class="w-full text-left border-collapse min-w-[900px]">
+            <table class="w-full text-left border-collapse min-w-[1050px]">
                 <thead class="bg-slate-100 text-xs font-semibold text-slate-600 uppercase">
                     <tr>
                         <th class="p-3">Kayıt Zamanı</th>
                         <th class="p-3">Makine</th>
                         <th class="p-3">Operasyon</th>
                         <th class="p-3">Mamül (Kablo) Adı</th>
-                        <th class="p-3">2 Yıllık Ort. Hız</th>
+                        <th class="p-3">ERP Rota Hızı</th>
+                        <th class="p-3 text-slate-400">2 Yıllık Ort.</th>
                         <th class="p-3">Sahadaki Hız</th>
-                        <th class="p-3 w-1/4">Açıklama</th>
+                        <th class="p-3">ERP Farkı</th>
+                        <th class="p-3 w-1/5">Açıklama</th>
                     </tr>
                 </thead>
                 <tbody class="text-sm divide-y divide-slate-100">
@@ -106,17 +148,31 @@
                         <td class="p-3 font-bold text-slate-800">{{ k.makine }}</td>
                         <td class="p-3 text-slate-600">{{ k.operasyon }}</td>
                         <td class="p-3 font-medium text-slate-800">{{ k.mamul_adi }}</td>
-                        <td class="p-3 font-mono font-bold text-blue-600">{{ k.sistem_hizi }}</td>
+                        <td class="p-3 font-mono font-bold text-blue-600">{{ k.erp_hizi or '-' }}</td>
+                        <td class="p-3 font-mono text-xs text-slate-400">{{ k.sistem_hizi or '-' }}</td>
                         <td class="p-3">
                             <span class="px-2.5 py-1 rounded bg-amber-100 text-amber-800 font-mono font-black text-sm">
                                 {{ k.sahadaki_hiz }}
                             </span>
                         </td>
+                        <td class="p-3 font-mono font-bold text-xs">
+                            {% if k.fark_yuzde is not none %}
+                                {% if k.fark_yuzde < 0 %}
+                                    <span class="px-2 py-1 rounded bg-red-100 text-red-700">%{{ k.fark_yuzde }}</span>
+                                {% elif k.fark_yuzde > 0 %}
+                                    <span class="px-2 py-1 rounded bg-emerald-100 text-emerald-700">+%{{ k.fark_yuzde }}</span>
+                                {% else %}
+                                    <span class="px-2 py-1 rounded bg-slate-100 text-slate-600">%0</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-slate-300">-</span>
+                            {% endif %}
+                        </td>
                         <td class="p-3 text-slate-600 text-xs">{{ k.aciklama or '-' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="p-4 text-center text-slate-400 text-sm">Henüz sahadan girilmiş bir hız kaydı bulunmuyor.</td>
+                        <td colspan="9" class="p-4 text-center text-slate-400 text-sm">Henüz sahadan girilmiş bir hız kaydı bulunmuyor.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
