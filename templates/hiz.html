@@ -25,7 +25,7 @@
             </div>
             {% endif %}
 
-            <form action="/hiz/bildir" method="POST" class="space-y-4">
+            <form id="hizForm" action="/hiz/bildir" method="POST" class="space-y-4">
 
                 <!-- 1. MAKİNE -->
                 <div>
@@ -43,13 +43,36 @@
                     </select>
                 </div>
 
-                <!-- 3. MAMÜL (KABLO) ARAMA VE SEÇİM -->
-                <div>
+                <!-- 3. MAMÜL (KABLO) CANLI ARAMA + AÇILIR LİSTE -->
+                <div id="mamulWrapper" class="relative">
                     <label class="block text-xs font-bold text-slate-700 uppercase mb-1">3. Mamül (Kablo) Adı</label>
-                    <input type="text" id="mamulAra" placeholder="🔍 Hızlı ara (örn: 3x2,5 veya NYM)..." disabled class="w-full px-3.5 py-2 mb-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 disabled:opacity-50 focus:border-amber-500 outline-none">
-                    <select id="mamulSelect" name="mamul_adi" required disabled class="w-full px-3.5 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 font-bold text-sm disabled:opacity-60 focus:ring-2 focus:ring-amber-500 outline-none">
-                        <option value="">-- Önce Operasyon Seçin --</option>
-                    </select>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="mamulInput"
+                            name="mamul_adi"
+                            autocomplete="off"
+                            required
+                            disabled
+                            placeholder="Önce operasyon seçin..."
+                            class="w-full px-3.5 py-3 pr-10 rounded-xl border border-slate-300 bg-slate-50 text-slate-800 font-bold text-sm disabled:opacity-60 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                        >
+                        <button
+                            type="button"
+                            id="mamulTemizleBtn"
+                            title="Temizle"
+                            class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold flex items-center justify-center"
+                        >✕</button>
+                    </div>
+
+                    <!-- AÇILIR ARAMA SONUÇLARI -->
+                    <div
+                        id="mamulDropdown"
+                        class="hidden absolute z-30 left-0 right-0 mt-1.5 bg-white border border-slate-300 rounded-xl shadow-lg overflow-hidden"
+                    >
+                        <div id="mamulSonucBilgi" class="px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500"></div>
+                        <div id="mamulListe" class="max-h-64 overflow-y-auto divide-y divide-slate-100"></div>
+                    </div>
                 </div>
 
                 <!-- GİZLİ REFERANS ALANLARI -->
@@ -76,7 +99,7 @@
                     <input type="text" inputmode="decimal" id="sahadakiHizInput" name="sahadaki_hiz" required placeholder="Örn: 620" class="w-full px-4 py-3.5 rounded-xl border-2 border-slate-300 text-lg font-mono font-black text-slate-900 focus:border-amber-500 outline-none">
                 </div>
 
-                <!-- CANLI YÜZDE FARK UYARI KUTUSU (FORM GÖNDERİLMEDEN ANLIK ÇALIŞIR) -->
+                <!-- CANLI YÜZDE FARK UYARI KUTUSU -->
                 <div id="canliFarkKutusu" class="hidden p-4 rounded-xl border text-center transition-all">
                     <div id="canliFarkBaslik" class="text-base font-black"></div>
                     <div id="canliFarkDetay" class="text-xs font-medium mt-1 opacity-90"></div>
@@ -100,8 +123,12 @@
 
         const makineSelect = document.getElementById("makineSelect");
         const operasyonSelect = document.getElementById("operasyonSelect");
-        const mamulAra = document.getElementById("mamulAra");
-        const mamulSelect = document.getElementById("mamulSelect");
+        const mamulWrapper = document.getElementById("mamulWrapper");
+        const mamulInput = document.getElementById("mamulInput");
+        const mamulTemizleBtn = document.getElementById("mamulTemizleBtn");
+        const mamulDropdown = document.getElementById("mamulDropdown");
+        const mamulSonucBilgi = document.getElementById("mamulSonucBilgi");
+        const mamulListe = document.getElementById("mamulListe");
 
         const sistemHiziInput = document.getElementById("sistemHiziInput");
         const erpHiziInput = document.getElementById("erpHiziInput");
@@ -117,9 +144,55 @@
         const aciklamaInput = document.getElementById("aciklamaInput");
 
         let aktifMamulListesi = [];
+        let guncelSonuclar = [];
+        let seciliIndeks = -1;
 
-        // Benzersiz makineleri doldur
-        const makineler = [...new Set(KATALOG.map(x => x.makine).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+        // Türkçe karakter, çift boşluk ve nokta/virgül toleranslı arama anahtarı
+        function normalizeSearch(str) {
+            return String(str || "")
+                .replace(/İ/g, "i")
+                .replace(/I/g, "i")
+                .replace(/ı/g, "i")
+                .toLowerCase()
+                .replace(/\u0307/g, "")
+                .replace(/ğ/g, "g")
+                .replace(/ü/g, "u")
+                .replace(/ş/g, "s")
+                .replace(/ö/g, "o")
+                .replace(/ç/g, "c")
+                .replace(/,/g, ".")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function sifirlaHizBilgisi() {
+            sistemHiziInput.value = "";
+            erpHiziInput.value = "";
+            hizBilgiKarti.classList.add("hidden");
+            canliFarkKutusu.classList.add("hidden");
+            aciklamaLabel.textContent = "5. Açıklama (Opsiyonel)";
+            aciklamaLabel.className = "block text-xs font-bold text-slate-700 uppercase mb-1";
+            aciklamaInput.classList.remove("border-red-400", "bg-red-50/40");
+        }
+
+        function sifirlaMamulAlani(kilitli = true) {
+            mamulInput.value = "";
+            mamulInput.disabled = kilitli;
+            mamulInput.placeholder = kilitli ? "Önce operasyon seçin..." : "🔍 Kablo ara (örn: nym 3x2.5 veya hffr 12x1,5)...";
+            mamulInput.classList.toggle("bg-slate-50", kilitli);
+            mamulInput.classList.toggle("bg-white", !kilitli);
+            mamulTemizleBtn.classList.add("hidden");
+            mamulDropdown.classList.add("hidden");
+            aktifMamulListesi = [];
+            guncelSonuclar = [];
+            seciliIndeks = -1;
+            sifirlaHizBilgisi();
+        }
+
+        // 1. Makineleri doldur
+        const makineler = [...new Set(KATALOG.map(x => x.makine).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b, "tr"));
+
         makineler.forEach(m => {
             const opt = document.createElement("option");
             opt.value = m;
@@ -127,26 +200,21 @@
             makineSelect.appendChild(opt);
         });
 
+        // 2. Makine değişince operasyonları doldur
         makineSelect.addEventListener("change", () => {
             const seciliMakine = makineSelect.value;
             operasyonSelect.innerHTML = '<option value="">-- Operasyon Seçin --</option>';
-            mamulSelect.innerHTML = '<option value="">-- Önce Operasyon Seçin --</option>';
-            mamulSelect.disabled = true;
-            mamulAra.value = "";
-            mamulAra.disabled = true;
-            hizBilgiKarti.classList.add("hidden");
-            canliFarkKutusu.classList.add("hidden");
-            sistemHiziInput.value = "";
-            erpHiziInput.value = "";
+            sifirlaMamulAlani(true);
 
             if (!seciliMakine) {
                 operasyonSelect.disabled = true;
+                operasyonSelect.classList.add("bg-slate-50");
                 return;
             }
 
             const operasyonlar = [...new Set(
                 KATALOG.filter(x => x.makine === seciliMakine).map(x => x.operasyon).filter(Boolean)
-            )].sort((a, b) => a.localeCompare(b, 'tr'));
+            )].sort((a, b) => a.localeCompare(b, "tr"));
 
             operasyonlar.forEach(op => {
                 const opt = document.createElement("option");
@@ -154,89 +222,211 @@
                 opt.textContent = op;
                 operasyonSelect.appendChild(opt);
             });
+
             operasyonSelect.disabled = false;
             operasyonSelect.classList.remove("bg-slate-50");
+
+            // Makinede tek operasyon varsa otomatik seç
+            if (operasyonlar.length === 1) {
+                operasyonSelect.value = operasyonlar[0];
+                operasyonYukle();
+            }
         });
 
-        function mamulListesiniDoldur(filtre = "") {
-            const aranan = filtre.trim().toLocaleLowerCase('tr-TR');
-            mamulSelect.innerHTML = '<option value="">-- Mamül (Kablo) Seçin --</option>';
-
-            const suzulmus = aranan
-                ? aktifMamulListesi.filter(item => item.mamul.toLocaleLowerCase('tr-TR').includes(aranan))
-                : aktifMamulListesi;
-
-            suzulmus.forEach(item => {
-                const opt = document.createElement("option");
-                opt.value = item.mamul;
-                opt.textContent = item.mamul;
-                opt.dataset.hiz = item.hiz || "";
-                opt.dataset.erp = item.erp_hiz || "";
-                mamulSelect.appendChild(opt);
-            });
-
-            if (suzulmus.length === 1 && aranan) {
-                mamulSelect.selectedIndex = 1;
-                mamulSecildi();
-            }
-        }
-
-        operasyonSelect.addEventListener("change", () => {
+        function operasyonYukle() {
             const seciliMakine = makineSelect.value;
             const seciliOp = operasyonSelect.value;
-            mamulAra.value = "";
-            hizBilgiKarti.classList.add("hidden");
-            canliFarkKutusu.classList.add("hidden");
-            sistemHiziInput.value = "";
-            erpHiziInput.value = "";
 
             if (!seciliOp) {
-                mamulSelect.innerHTML = '<option value="">-- Önce Operasyon Seçin --</option>';
-                mamulSelect.disabled = true;
-                mamulAra.disabled = true;
+                sifirlaMamulAlani(true);
                 return;
             }
 
-            aktifMamulListesi = KATALOG
-                .filter(x => x.makine === seciliMakine && x.operasyon === seciliOp && x.mamul)
-                .sort((a, b) => a.mamul.localeCompare(b.mamul, 'tr'));
+            // Aynı mamülü tekilleştir (ERP hızı olan kaydı önceliklendir)
+            const tekilMap = new Map();
+            KATALOG.forEach(x => {
+                if (x.makine === seciliMakine && x.operasyon === seciliOp && x.mamul) {
+                    const key = normalizeSearch(x.mamul);
+                    const mevcut = tekilMap.get(key);
+                    if (!mevcut || (!mevcut.erp_hiz && x.erp_hiz)) {
+                        tekilMap.set(key, {
+                            mamul: x.mamul,
+                            hiz: x.hiz || "",
+                            erp_hiz: x.erp_hiz || "",
+                            searchKey: key
+                        });
+                    }
+                }
+            });
 
-            mamulListesiniDoldur();
-            mamulSelect.disabled = false;
-            mamulSelect.classList.remove("bg-slate-50");
-            mamulAra.disabled = false;
-            mamulAra.classList.remove("bg-slate-50");
-        });
+            sifirlaMamulAlani(false);
+            aktifMamulListesi = Array.from(tekilMap.values())
+                .sort((a, b) => a.mamul.localeCompare(b.mamul, "tr"));
+        }
 
-        mamulAra.addEventListener("input", () => {
-            mamulListesiniDoldur(mamulAra.value);
-        });
+        operasyonSelect.addEventListener("change", operasyonYukle);
 
-        function mamulSecildi() {
-            const seciliOpt = mamulSelect.options[mamulSelect.selectedIndex];
-            if (!seciliOpt || !seciliOpt.value) {
-                hizBilgiKarti.classList.add("hidden");
-                sistemHiziInput.value = "";
-                erpHiziInput.value = "";
-                canliFarkKutusu.classList.add("hidden");
+        // 3. Canlı Mamül Arama Listesi
+        function renderDropdown(filtreMetni = "") {
+            const kelimeler = normalizeSearch(filtreMetni).split(" ").filter(Boolean);
+
+            guncelSonuclar = kelimeler.length === 0
+                ? aktifMamulListesi
+                : aktifMamulListesi.filter(item => kelimeler.every(k => item.searchKey.includes(k)));
+
+            mamulListe.innerHTML = "";
+            seciliIndeks = -1;
+
+            if (guncelSonuclar.length === 0) {
+                mamulSonucBilgi.textContent = "Eşleşen kayıt bulunamadı";
+                const bosDiv = document.createElement("div");
+                bosDiv.className = "px-3.5 py-3 text-xs text-slate-400 text-center";
+                bosDiv.textContent = "Katalogda bulunamadı. İsterseniz manuel yazıp kaydedebilirsiniz.";
+                mamulListe.appendChild(bosDiv);
+                mamulDropdown.classList.remove("hidden");
                 return;
             }
 
-            const ikiYillik = seciliOpt.dataset.hiz || "";
-            const erpHiz = seciliOpt.dataset.erp || "";
+            const MAX_GOSTER = 100;
+            const gosterilecekler = guncelSonuclar.slice(0, MAX_GOSTER);
+            mamulSonucBilgi.textContent = guncelSonuclar.length > MAX_GOSTER
+                ? `${guncelSonuclar.length} sonuç bulundu (ilk ${MAX_GOSTER} gösteriliyor, aramayı daraltın)`
+                : `${guncelSonuclar.length} sonuç bulundu`;
 
-            sistemHiziInput.value = ikiYillik;
-            erpHiziInput.value = erpHiz;
+            const fragment = document.createDocumentFragment();
+            gosterilecekler.forEach((item, idx) => {
+                const row = document.createElement("button");
+                row.type = "button";
+                row.dataset.index = idx;
+                row.className = "mamul-secenek w-full text-left px-3.5 py-2.5 hover:bg-amber-50 focus:bg-amber-50 flex items-center justify-between gap-2 transition";
 
-            erpHizGosterge.textContent = erpHiz ? `${erpHiz}` : "Tanımsız";
-            ikiYillikHizGosterge.textContent = ikiYillik ? `${ikiYillik}` : "-";
+                const adSpan = document.createElement("span");
+                adSpan.className = "text-xs md:text-sm font-semibold text-slate-800 break-words";
+                adSpan.textContent = item.mamul;
+                row.appendChild(adSpan);
+
+                const badgeWrap = document.createElement("span");
+                badgeWrap.className = "shrink-0 flex items-center gap-1";
+
+                if (item.erp_hiz) {
+                    const erpBadge = document.createElement("span");
+                    erpBadge.className = "px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[11px] font-bold";
+                    erpBadge.textContent = `ERP ${item.erp_hiz}`;
+                    badgeWrap.appendChild(erpBadge);
+                }
+                if (item.hiz) {
+                    const ortBadge = document.createElement("span");
+                    ortBadge.className = "px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-mono text-[10px]";
+                    ortBadge.textContent = item.hiz;
+                    badgeWrap.appendChild(ortBadge);
+                }
+
+                row.appendChild(badgeWrap);
+
+                row.addEventListener("click", () => {
+                    mamulSec(item);
+                });
+
+                fragment.appendChild(row);
+            });
+
+            mamulListe.appendChild(fragment);
+            mamulDropdown.classList.remove("hidden");
+        }
+
+        function mamulSec(item) {
+            mamulInput.value = item.mamul;
+            mamulTemizleBtn.classList.remove("hidden");
+            mamulDropdown.classList.add("hidden");
+
+            sistemHiziInput.value = item.hiz || "";
+            erpHiziInput.value = item.erp_hiz || "";
+
+            erpHizGosterge.textContent = item.erp_hiz ? item.erp_hiz : "Tanımsız";
+            ikiYillikHizGosterge.textContent = item.hiz ? item.hiz : "-";
             hizBilgiKarti.classList.remove("hidden");
 
             hesaplaCanliFark();
         }
 
-        mamulSelect.addEventListener("change", mamulSecildi);
+        function vurgulaSecenek() {
+            const ogeler = mamulListe.querySelectorAll(".mamul-secenek");
+            ogeler.forEach((el, idx) => {
+                el.classList.toggle("bg-amber-100", idx === seciliIndeks);
+            });
+            if (seciliIndeks >= 0 && ogeler[seciliIndeks]) {
+                ogeler[seciliIndeks].scrollIntoView({ block: "nearest" });
+            }
+        }
 
+        mamulInput.addEventListener("focus", () => {
+            if (!mamulInput.disabled) {
+                renderDropdown(mamulInput.value);
+            }
+        });
+
+        mamulInput.addEventListener("input", () => {
+            const deger = mamulInput.value;
+            mamulTemizleBtn.classList.toggle("hidden", deger.length === 0);
+
+            // Yazı değiştiyse tam eşleşme var mı kontrol et; yoksa eski hız bilgisini temizle
+            const norm = normalizeSearch(deger);
+            const tamEslesme = aktifMamulListesi.find(x => x.searchKey === norm);
+            if (tamEslesme) {
+                sistemHiziInput.value = tamEslesme.hiz || "";
+                erpHiziInput.value = tamEslesme.erp_hiz || "";
+                erpHizGosterge.textContent = tamEslesme.erp_hiz ? tamEslesme.erp_hiz : "Tanımsız";
+                ikiYillikHizGosterge.textContent = tamEslesme.hiz ? tamEslesme.hiz : "-";
+                hizBilgiKarti.classList.remove("hidden");
+                hesaplaCanliFark();
+            } else {
+                sifirlaHizBilgisi();
+            }
+
+            renderDropdown(deger);
+        });
+
+        // Klavye ok tuşları ve Enter desteği
+        mamulInput.addEventListener("keydown", (e) => {
+            if (mamulDropdown.classList.contains("hidden")) return;
+            const ogeler = mamulListe.querySelectorAll(".mamul-secenek");
+            if (ogeler.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                seciliIndeks = (seciliIndeks + 1) % ogeler.length;
+                vurgulaSecenek();
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                seciliIndeks = (seciliIndeks - 1 + ogeler.length) % ogeler.length;
+                vurgulaSecenek();
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                const hedefIdx = seciliIndeks >= 0 ? seciliIndeks : 0;
+                if (guncelSonuclar[hedefIdx]) {
+                    mamulSec(guncelSonuclar[hedefIdx]);
+                }
+            } else if (e.key === "Escape") {
+                mamulDropdown.classList.add("hidden");
+            }
+        });
+
+        mamulTemizleBtn.addEventListener("click", () => {
+            mamulInput.value = "";
+            mamulTemizleBtn.classList.add("hidden");
+            sifirlaHizBilgisi();
+            mamulInput.focus();
+            renderDropdown("");
+        });
+
+        // Dışarı tıklayınca açılır listeyi kapat (mobil kaydırmayı bozmaz)
+        document.addEventListener("click", (e) => {
+            if (!mamulWrapper.contains(e.target)) {
+                mamulDropdown.classList.add("hidden");
+            }
+        });
+
+        // 4. Canlı Yüzde Fark Hesabı
         function hesaplaCanliFark() {
             const rawSaha = sahadakiHizInput.value.trim().replace(",", ".");
             const rawErp = erpHiziInput.value.trim().replace(",", ".");
@@ -262,29 +452,27 @@
 
             const farkYuzde = ((sahaSayi - erpSayi) / erpSayi) * 100;
             const mutlakYuzde = Math.abs(farkYuzde).toFixed(1);
+            const farkBirim = (sahaSayi - erpSayi).toFixed(1).replace(".0", "");
 
             if (farkYuzde < -0.05) {
-                // DÜŞÜK HIZ UYARISI
                 canliFarkKutusu.className = "p-4 rounded-xl border-2 border-red-300 bg-red-50 text-red-800 text-center";
                 canliFarkBaslik.textContent = `⚠️ ROTADAKİ HIZDAN %${mutlakYuzde} DÜŞÜK`;
-                canliFarkDetay.textContent = `ERP Hızı: ${erpSayi} → Girilen Hız: ${sahaSayi} (${(sahaSayi - erpSayi).toFixed(1).replace('.0', '')} fark)`;
+                canliFarkDetay.textContent = `ERP Hızı: ${erpSayi} → Girilen Hız: ${sahaSayi} (${farkBirim} fark)`;
                 canliFarkKutusu.classList.remove("hidden");
 
                 aciklamaLabel.textContent = "5. Açıklama (Düşük Hız Sebebini Yazınız)";
                 aciklamaLabel.className = "block text-xs font-bold text-red-700 uppercase mb-1";
                 aciklamaInput.classList.add("border-red-400", "bg-red-50/40");
             } else if (farkYuzde > 0.05) {
-                // YÜKSEK HIZ BİLGİSİ
                 canliFarkKutusu.className = "p-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-800 text-center";
                 canliFarkBaslik.textContent = `✅ ROTADAKİ HIZDAN %${mutlakYuzde} YÜKSEK`;
-                canliFarkDetay.textContent = `ERP Hızı: ${erpSayi} → Girilen Hız: ${sahaSayi} (+${(sahaSayi - erpSayi).toFixed(1).replace('.0', '')} fark)`;
+                canliFarkDetay.textContent = `ERP Hızı: ${erpSayi} → Girilen Hız: ${sahaSayi} (+${farkBirim} fark)`;
                 canliFarkKutusu.classList.remove("hidden");
 
                 aciklamaLabel.textContent = "5. Açıklama (Opsiyonel)";
                 aciklamaLabel.className = "block text-xs font-bold text-slate-700 uppercase mb-1";
                 aciklamaInput.classList.remove("border-red-400", "bg-red-50/40");
             } else {
-                // TAM HEDEF HIZ
                 canliFarkKutusu.className = "p-4 rounded-xl border-2 border-blue-300 bg-blue-50 text-blue-800 text-center";
                 canliFarkBaslik.textContent = `🎯 ROTADAKİ HIZ İLE AYNI (%0)`;
                 canliFarkDetay.textContent = `ERP Hızı: ${erpSayi} → Girilen Hız: ${sahaSayi}`;
