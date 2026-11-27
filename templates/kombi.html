@@ -27,9 +27,22 @@
     .container { max-width: 980px; margin: 0 auto; }
     .header {
       display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
-      gap: 12px; margin-bottom: 18px;
+      gap: 12px; margin-bottom: 14px;
     }
     h1 { font-size: 1.35rem; margin: 0; }
+    .tabs {
+      display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .tab-btn {
+      background: var(--card); color: var(--muted); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
+    }
+    .tab-btn.active {
+      background: var(--accent); color: #0f172a; border-color: var(--accent);
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
     .badge {
       display: inline-block; padding: 4px 10px; border-radius: 999px;
       font-size: 0.78rem; font-weight: 600;
@@ -75,6 +88,11 @@
     th { color: var(--muted); font-weight: 600; }
     .table-wrap { overflow-x: auto; }
     .login-box { max-width: 360px; margin: 60px auto; }
+    .guide-list { margin: 8px 0 0 0; padding-left: 18px; line-height: 1.6; color: #e2e8f0; font-size: 0.92rem; }
+    .guide-list li { margin-bottom: 6px; }
+    .guide-title { font-size: 1.05rem; margin: 0 0 8px 0; color: var(--accent); }
+    .diagram-wrap { overflow-x: auto; padding-top: 8px; }
+    .diagram-svg { width: 100%; min-width: 720px; height: auto; display: block; }
   </style>
 </head>
 <body>
@@ -112,130 +130,272 @@
       </div>
     </div>
 
+    <div class="tabs">
+      <button type="button" class="tab-btn active" onclick="switchTab('panel', this)">Kontrol Paneli</button>
+      <button type="button" class="tab-btn" onclick="switchTab('guide', this)">Nasıl Çalışır?</button>
+    </div>
+
     {% if message %}
       <div class="alert">{{ message }}</div>
     {% endif %}
 
-    <div class="grid">
-      <div class="card">
-        <div class="label">Ev İç Sıcaklığı (2 Klima Ort.)</div>
-        <div class="value">{{ "%.2f"|format(settings.last_sensor_temp_c) if settings.last_sensor_temp_c is not none else "-" }} °C</div>
-        <div class="sub">
-          Hedef: <strong>{{ "%.1f"|format(settings.target_room_temp_c) }} °C</strong> |
-          Trend: {{ "%+.2f"|format(trend) }} °C/sa
+    <div id="tab-panel" class="tab-pane active">
+      <div class="grid">
+        <div class="card">
+          <div class="label">Ev İç Sıcaklığı (2 Klima Ort.)</div>
+          <div class="value">{{ "%.2f"|format(settings.last_sensor_temp_c) if settings.last_sensor_temp_c is not none else "-" }} °C</div>
+          <div class="sub">
+            Hedef: <strong>{{ "%.1f"|format(settings.target_room_temp_c) }} °C</strong> |
+            Trend: {{ "%+.2f"|format(trend) }} °C/sa
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Öğrenilen Ev Isıl Profili</div>
+          <div class="value">~{{ est_2c_min }} dk <span style="font-size:0.9rem; color:var(--muted);">/ +2°C</span></div>
+          <div class="sub">
+            Isınma: +{{ "%.2f"|format(est_net_rate) }} °C/sa ({{ profile.heat_samples }} veri) |
+            Soğuma: -{{ "%.2f"|format(est_cool_rate) }} °C/sa ({{ profile.loss_samples }} veri)
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Kazan Gidiş Suyu / Hedef</div>
+          <div class="value">
+            {{ boiler.get("supply_temp_c", "-") }} °C
+            <span style="font-size:1rem; color:var(--muted);">→ {{ "%.0f"|format(settings.pi_state.last_output_supply_temp_c) }} °C</span>
+          </div>
+          <div class="sub">
+            Brülör: {{ "YANIYOR" if boiler.get("burner_active") else "BEKLEMEDE" }}
+            ({{ boiler.get("modulation_pct", "-") }}%) | Pompa: {{ boiler.get("pump_status", "-") }}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Dış Hava &amp; Basınç &amp; Gaz</div>
+          <div class="value">
+            {{ "%.1f"|format(settings.last_outside_temp_c) if settings.last_outside_temp_c is not none else "-" }} °C
+            <span style="font-size:1rem; color:var(--muted);">| {{ boiler.get("pressure_bar", "-") }} bar</span>
+          </div>
+          <div class="sub">
+            Güneş: {{ "%.0f"|format(settings.last_solar_wm2) if settings.last_solar_wm2 is not none else "-" }} W/m² |
+            Gaz: {{ boiler.get("gas_heating_today_m3", "-") }} m³ ({{ boiler.get("gas_heating_month_m3", "-") }} ay)
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <div class="label">Öğrenilen Ev Isıl Profili</div>
-        <div class="value">~{{ est_2c_min }} dk <span style="font-size:0.9rem; color:var(--muted);">/ +2°C</span></div>
-        <div class="sub">
-          Isınma: +{{ "%.2f"|format(est_net_rate) }} °C/sa ({{ profile.heat_samples }} veri) |
-          Soğuma: -{{ "%.2f"|format(est_cool_rate) }} °C/sa ({{ profile.loss_samples }} veri)
-        </div>
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="label">Son Karar Gerekçesi</div>
+        <div>{{ settings.last_decision_reason or "Henüz kontrol döngüsü çalıştırılmadı." }}</div>
       </div>
 
-      <div class="card">
-        <div class="label">Kazan Gidiş Suyu / Hedef</div>
-        <div class="value">
-          {{ boiler.get("supply_temp_c", "-") }} °C
-          <span style="font-size:1rem; color:var(--muted);">→ {{ "%.0f"|format(settings.pi_state.last_output_supply_temp_c) }} °C</span>
-        </div>
-        <div class="sub">
-          Brülör: {{ "YANIYOR" if boiler.get("burner_active") else "BEKLEMEDE" }}
-          ({{ boiler.get("modulation_pct", "-") }}%) | Pompa: {{ boiler.get("pump_status", "-") }}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="label">Dış Hava &amp; Basınç &amp; Gaz</div>
-        <div class="value">
-          {{ "%.1f"|format(settings.last_outside_temp_c) if settings.last_outside_temp_c is not none else "-" }} °C
-          <span style="font-size:1rem; color:var(--muted);">| {{ boiler.get("pressure_bar", "-") }} bar</span>
-        </div>
-        <div class="sub">
-          Güneş: {{ "%.0f"|format(settings.last_solar_wm2) if settings.last_solar_wm2 is not none else "-" }} W/m² |
-          Gaz: {{ boiler.get("gas_heating_today_m3", "-") }} m³ ({{ boiler.get("gas_heating_month_m3", "-") }} ay)
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom: 16px;">
-      <div class="label">Son Karar Gerekçesi</div>
-      <div>{{ settings.last_decision_reason or "Henüz kontrol döngüsü çalıştırılmadı." }}</div>
-    </div>
-
-    <div class="card" style="margin-bottom: 16px;">
-      <h2 style="font-size:1rem; margin:0 0 12px 0;">Kontrol, Sıcaklık ve Saat Ayarları</h2>
-      <form method="post" action="/kombi/settings" class="row">
-        <label class="switch" style="margin-right: 8px; padding-bottom: 8px;">
-          <input type="checkbox" name="automation_enabled" {% if settings.automation_enabled %}checked{% endif %} />
-          Otomasyonu Aktif Et
-        </label>
-        <div class="field">
-          <label class="label" for="comfort_temp_c">Konfor (°C)</label>
-          <input id="comfort_temp_c" name="comfort_temp_c" type="number" step="0.5" min="16" max="26" value="{{ settings.comfort_temp_c }}" />
-        </div>
-        <div class="field">
-          <label class="label" for="away_temp_c">Ekonomi (°C)</label>
-          <input id="away_temp_c" name="away_temp_c" type="number" step="0.5" min="15" max="24" value="{{ settings.away_temp_c }}" />
-        </div>
-        <div class="field">
-          <label class="label" for="away_start_time">Çıkış Saati</label>
-          <input id="away_start_time" name="away_start_time" type="time" value="{{ settings.away_start_time }}" />
-        </div>
-        <div class="field">
-          <label class="label" for="comfort_ready_time">Hazır Olma Saati</label>
-          <input id="comfort_ready_time" name="comfort_ready_time" type="time" value="{{ settings.comfort_ready_time }}" />
-        </div>
-        <button type="submit">Ayarları Kaydet</button>
-      </form>
-      <div class="sub" style="margin-top: 10px;">
-        Hafta içi {{ settings.away_start_time }}–{{ settings.comfort_ready_time }} arası Ekonomi modundadır; öğrenilen ev hızına göre {{ settings.comfort_ready_time }}'da hedefe yetişecek şekilde ön ısıtma başlatılır. Hafta sonu tüm gün Konfor modundadır.
-      </div>
-      <div class="row" style="margin-top: 12px;">
-        <form method="post" action="/kombi/run-now">
-          <button type="submit" class="secondary">Şimdi Kontrol Döngüsünü Çalıştır</button>
+      <div class="card" style="margin-bottom: 16px;">
+        <h2 style="font-size:1rem; margin:0 0 12px 0;">Kontrol, Sıcaklık ve Saat Ayarları</h2>
+        <form method="post" action="/kombi/settings" class="row">
+          <label class="switch" style="margin-right: 8px; padding-bottom: 8px;">
+            <input type="checkbox" name="automation_enabled" {% if settings.automation_enabled %}checked{% endif %} />
+            Otomasyonu Aktif Et
+          </label>
+          <div class="field">
+            <label class="label" for="comfort_temp_c">Konfor (°C)</label>
+            <input id="comfort_temp_c" name="comfort_temp_c" type="number" step="0.5" min="16" max="26" value="{{ settings.comfort_temp_c }}" />
+          </div>
+          <div class="field">
+            <label class="label" for="away_temp_c">Ekonomi (°C)</label>
+            <input id="away_temp_c" name="away_temp_c" type="number" step="0.5" min="15" max="24" value="{{ settings.away_temp_c }}" />
+          </div>
+          <div class="field">
+            <label class="label" for="away_start_time">Çıkış Saati</label>
+            <input id="away_start_time" name="away_start_time" type="time" value="{{ settings.away_start_time }}" />
+          </div>
+          <div class="field">
+            <label class="label" for="comfort_ready_time">Hazır Olma Saati</label>
+            <input id="comfort_ready_time" name="comfort_ready_time" type="time" value="{{ settings.comfort_ready_time }}" />
+          </div>
+          <button type="submit">Ayarları Kaydet</button>
         </form>
-        <form method="post" action="/kombi/run-now">
-          <input type="hidden" name="dry_run" value="on" />
-          <button type="submit" class="secondary">Kuru Test (Kombiye Yazma)</button>
-        </form>
+        <div class="sub" style="margin-top: 10px;">
+          Hafta içi {{ settings.away_start_time }}–{{ settings.comfort_ready_time }} arası Ekonomi modundadır; öğrenilen ev hızına göre {{ settings.comfort_ready_time }}'da hedefe yetişecek şekilde ön ısıtma başlatılır. Hafta sonu tüm gün Konfor modundadır.
+        </div>
+        <div class="row" style="margin-top: 12px;">
+          <form method="post" action="/kombi/run-now">
+            <button type="submit" class="secondary">Şimdi Kontrol Döngüsünü Çalıştır</button>
+          </form>
+          <form method="post" action="/kombi/run-now">
+            <input type="hidden" name="dry_run" value="on" />
+            <button type="submit" class="secondary">Kuru Test (Kombiye Yazma)</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:1rem; margin:0 0 10px 0;">Son Kayıtlar (Son 24 Döngü)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Saat (TR)</th>
+                <th>Mod</th>
+                <th>Oda (°C)</th>
+                <th>Hedef (°C)</th>
+                <th>Dış (°C)</th>
+                <th>Gidiş / Karar</th>
+                <th>Brülör / Mod</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in logs %}
+              <tr>
+                <td>{{ row.time }}</td>
+                <td>{{ row.mode }}</td>
+                <td>{{ "%.2f"|format(row.indoor) if row.indoor is not none else "-" }}</td>
+                <td>{{ "%.1f"|format(row.target_room) if row.target_room is not none else "-" }}</td>
+                <td>{{ "%.1f"|format(row.outside) if row.outside is not none else "-" }}</td>
+                <td>{{ row.supply if row.supply is not none else "-" }} → {{ "%.0f"|format(row.target_supply) if row.target_supply is not none else "-" }} °C</td>
+                <td>{{ "Açık" if row.burner else "Kapalı" }} ({{ row.mod if row.mod is not none else "-" }}%)</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h2 style="font-size:1rem; margin:0 0 10px 0;">Son Kayıtlar (Son 24 Döngü)</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Saat (TR)</th>
-              <th>Mod</th>
-              <th>Oda (°C)</th>
-              <th>Hedef (°C)</th>
-              <th>Dış (°C)</th>
-              <th>Gidiş / Karar</th>
-              <th>Brülör / Mod</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in logs %}
-            <tr>
-              <td>{{ row.time }}</td>
-              <td>{{ row.mode }}</td>
-              <td>{{ "%.2f"|format(row.indoor) if row.indoor is not none else "-" }}</td>
-              <td>{{ "%.1f"|format(row.target_room) if row.target_room is not none else "-" }}</td>
-              <td>{{ "%.1f"|format(row.outside) if row.outside is not none else "-" }}</td>
-              <td>{{ row.supply if row.supply is not none else "-" }} → {{ "%.0f"|format(row.target_supply) if row.target_supply is not none else "-" }} °C</td>
-              <td>{{ "Açık" if row.burner else "Kapalı" }} ({{ row.mod if row.mod is not none else "-" }}%)</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <div id="tab-guide" class="tab-pane">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="card">
+          <h2 class="guide-title">Amacı Nedir?</h2>
+          <p style="margin:0; line-height:1.6; color:#e2e8f0; font-size:0.92rem;">
+            Evde bilgisayar açık bırakmadan, evin sıcaklığına ve hava durumuna göre kombiyi kendi kendine en ekonomik şekilde ayarlar. Faturayı şişirmeden evi istediğiniz saatte sıcak tutar.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2 class="guide-title">Bilgileri Nereden Alır?</h2>
+          <ul class="guide-list">
+            <li><strong>Ev Sıcaklığı:</strong> Evdeki 2 klimanın sensörlerinden okunur ve ortalaması alınır <em>(klimaların açık olması gerekmez)</em>.</li>
+            <li><strong>Dış Hava:</strong> Denizli Başkarcı hava durumu ve güneş durumuna internetten bakılır.</li>
+            <li><strong>Kombi Durumu:</strong> Viessmann kombiye internet üzerinden bağlanılıp su sıcaklığı, basınç ve yakıt bilgisi okunur.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="card">
+          <h2 class="guide-title">5 Dakikada Bir Ne Yapar?</h2>
+          <ol class="guide-list">
+            <li>Evin iç sıcaklığını, dış havayı ve kombinin durumunu kontrol eder.</li>
+            <li>Evin ne kadar hızlı ısınıp soğuduğunu geçmiş günlerden öğrenir.</li>
+            <li><strong>Siz işteyken (hafta içi gündüz):</strong> Evi hafif ekonomi modunda tutar; eve geliş saatiniz yaklaşırken tam vaktinde yetişecek şekilde yavaşça ısıtmaya başlar.</li>
+            <li><strong>Siz evdeyken (akşam ve hafta sonu):</strong> Evi belirlediğiniz konfor sıcaklığında sabit tutar.</li>
+            <li>Güneş evi ısıtırsa kombiyi kısar; dışarısı soğuyacaksa önceden hafifçe destekler.</li>
+          </ol>
+        </div>
+
+        <div class="card">
+          <h2 class="guide-title">Güvenlik Önlemleri</h2>
+          <ul class="guide-list">
+            <li>İnternet veya sensörlerden <strong>15 dakika</strong> veri gelmezse kombiyi kapatmaz, güvenli orta sıcaklıkta (<strong>42°C</strong>) sabit tutar.</li>
+            <li>Kombiyi sık sık aç-kapa yapıp yormaz, suyu yumuşak adımlarla (en fazla ±2°C) değiştirir.</li>
+            <li>Panelden tek tıkla <strong>"Otomasyonu Aktif Et"</strong> işaretini kaldırırsanız kombiye hiçbir müdahale yapılmaz.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="guide-title">Sistem ve Veri Akış Diyagramı</h2>
+        <div class="sub" style="margin-bottom: 10px;">Kodun yayınlanmasından kombinin ayarlanmasına kadar tüm bulut akışı:</div>
+        <div class="diagram-wrap">
+          <svg class="diagram-svg" viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#22c55e" />
+              </marker>
+              <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+              </marker>
+            </defs>
+
+            <!-- Üst Satır: GitHub -> OnRender <- Cron-Job -->
+            <rect x="20" y="20" width="210" height="62" rx="10" fill="#0f172a" stroke="#64748b" stroke-width="1.5" />
+            <text x="125" y="45" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">GitHub Deposu</text>
+            <text x="125" y="65" fill="#94a3b8" font-size="11" text-anchor="middle">Kod &amp; Güncelleme Kaynağı</text>
+
+            <rect x="335" y="16" width="250" height="70" rx="12" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+            <text x="460" y="42" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">OnRender Bulut Sunucusu</text>
+            <text x="460" y="62" fill="#cbd5e1" font-size="11" text-anchor="middle">Ana Beyin (/kombi &amp; /api/kombi/tick)</text>
+
+            <rect x="690" y="20" width="210" height="62" rx="10" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="795" y="45" fill="#fbbf24" font-size="13" font-weight="700" text-anchor="middle">Cron-Job Zamanlayıcı</text>
+            <text x="795" y="65" fill="#94a3b8" font-size="11" text-anchor="middle">Her 5 dakikada bir uyandırır</text>
+
+            <line x1="230" y1="51" x2="332" y2="51" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+            <text x="281" y="42" fill="#94a3b8" font-size="10" text-anchor="middle">Otomatik Yayın</text>
+
+            <line x1="690" y1="51" x2="588" y2="51" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <text x="639" y="42" fill="#fbbf24" font-size="10" text-anchor="middle">5 dk Ping</text>
+
+            <!-- Orta Satır: 4 Veri Kaynağı -->
+            <rect x="20" y="135" width="205" height="68" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="122" y="160" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">2 Midea Klima (Bulut)</text>
+            <text x="122" y="180" fill="#94a3b8" font-size="11" text-anchor="middle">Ev İçi Ortalama Sıcaklık</text>
+
+            <rect x="245" y="135" width="205" height="68" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="347" y="160" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">Dış Hava (Başkarcı)</text>
+            <text x="347" y="180" fill="#94a3b8" font-size="11" text-anchor="middle">Dış Sıcaklık &amp; Güneş Tahmini</text>
+
+            <rect x="470" y="135" width="205" height="68" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="572" y="160" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">Viessmann Kombi (Bulut)</text>
+            <text x="572" y="180" fill="#94a3b8" font-size="11" text-anchor="middle">Gidiş Suyu, Brülör, Basınç, Gaz</text>
+
+            <rect x="695" y="135" width="205" height="68" rx="10" fill="#0f172a" stroke="#a855f7" stroke-width="1.5" />
+            <text x="797" y="160" fill="#e9d5ff" font-size="13" font-weight="700" text-anchor="middle">Neon PostgreSQL</text>
+            <text x="797" y="180" fill="#94a3b8" font-size="11" text-anchor="middle">Öğrenilen Hız, Şifreler &amp; Geçmiş</text>
+
+            <!-- OnRender -> 4 Veri Kaynağı Okları -->
+            <line x1="380" y1="86" x2="140" y2="132" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="430" y1="86" x2="355" y2="132" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="490" y1="86" x2="565" y2="132" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="540" y1="86" x2="780" y2="132" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+
+            <!-- Karar Kutusu (Zaman Şartı + Öğrenme) -->
+            <rect x="170" y="242" width="580" height="72" rx="12" fill="#172554" stroke="#38bdf8" stroke-width="2" />
+            <text x="460" y="268" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">Akıllı Karar Motoru (OnRender İçinde Hesaplanır)</text>
+            <text x="460" y="288" fill="#bae6fd" font-size="11" text-anchor="middle">Zaman Şartı (Hafta İçi Çıkış/Dönüş &amp; Hafta Sonu) + Öğrenilen Isınma/Soğuma + Güneş/Soğuma Öngörüsü</text>
+            <text x="460" y="304" fill="#94a3b8" font-size="10" text-anchor="middle">Koruma: 15 dk veri yoksa 42°C sabit | Aktif aralık 39–53°C | Hedef üstü 30°C bekleme</text>
+
+            <line x1="122" y1="203" x2="260" y2="239" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="347" y1="203" x2="390" y2="239" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="572" y1="203" x2="530" y2="239" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+            <line x1="797" y1="203" x2="660" y2="239" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#arrow)" />
+
+            <!-- Alt Çıkış: Kombiye Yaz & Neon'a Kaydet -->
+            <rect x="140" y="346" width="280" height="58" rx="10" fill="#052e16" stroke="#22c55e" stroke-width="1.8" />
+            <text x="280" y="371" fill="#4ade80" font-size="13" font-weight="700" text-anchor="middle">Kombiyi Ayarlar (Viessmann)</text>
+            <text x="280" y="390" fill="#bbf7d0" font-size="11" text-anchor="middle">Otomasyon AÇIK ise yeni gidiş suyu gönderilir</text>
+
+            <rect x="500" y="346" width="280" height="58" rx="10" fill="#1e1b4b" stroke="#a855f7" stroke-width="1.8" />
+            <text x="640" y="371" fill="#e9d5ff" font-size="13" font-weight="700" text-anchor="middle">Hafızaya Kaydeder (Neon)</text>
+            <text x="640" y="390" fill="#cbd5e1" font-size="11" text-anchor="middle">Son kayıtlar ve ertesi gün için yeni öğrenme</text>
+
+            <line x1="370" y1="314" x2="295" y2="343" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)" />
+            <line x1="550" y1="314" x2="625" y2="343" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+          </svg>
+        </div>
       </div>
     </div>
   {% endif %}
 </div>
+<script>
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('tab-' + tabId).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
 </body>
 </html>
