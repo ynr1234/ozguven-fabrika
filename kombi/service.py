@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from .db import (
     estimate_indoor_trend_c_per_hour,
-    estimate_learned_heating_rate_c_per_hour,
+    learn_thermal_profile,
     load_control_settings,
     log_temperature,
     save_control_state,
@@ -22,11 +22,18 @@ logger = logging.getLogger("kombi-app")
 _cycle_lock = threading.Lock()
 
 
-def load_pi_config(comfort_temp_c: float, away_temp_c: float) -> PIConfig:
+def load_pi_config(
+    comfort_temp_c: float,
+    away_temp_c: float,
+    away_start_time: str,
+    comfort_ready_time: str,
+) -> PIConfig:
     return PIConfig(
         comfort_temp_c=comfort_temp_c,
         away_temp_c=away_temp_c,
-        kp=float(os.getenv("PI_KP", "2.8")),
+        away_start_time=away_start_time,
+        comfort_ready_time=comfort_ready_time,
+        kp=float(os.getenv("PI_KP", "2.6")),
         ki=float(os.getenv("PI_KI", "0.0012")),
         trend_damping=float(os.getenv("PI_TREND_DAMPING", "4.0")),
         min_active_supply_temp_c=float(os.getenv("MIN_ACTIVE_SUPPLY_TEMP_C", "39.0")),
@@ -74,7 +81,12 @@ def read_room_and_ac_outdoor() -> tuple[Optional[float], Optional[float], Option
 
 def run_cycle(dry_run: bool = False) -> Dict[str, Any]:
     settings = load_control_settings()
-    config = load_pi_config(settings.comfort_temp_c, settings.away_temp_c)
+    config = load_pi_config(
+        settings.comfort_temp_c,
+        settings.away_temp_c,
+        settings.away_start_time,
+        settings.comfort_ready_time,
+    )
 
     indoor_temp, ac_outdoor_temp, sensor_ts, room_label = read_room_and_ac_outdoor()
     weather = fetch_outdoor_weather()
@@ -82,10 +94,10 @@ def run_cycle(dry_run: bool = False) -> Dict[str, Any]:
     effective_outside = ac_outdoor_temp if ac_outdoor_temp is not None else weather.outside_temp_c
     outside_src = "midea-outdoor" if ac_outdoor_temp is not None else weather.source
 
-    indoor_trend = estimate_indoor_trend_c_per_hour(90)
-    learned_rate = estimate_learned_heating_rate_c_per_hour(0.45)
-
     now = datetime.now(timezone.utc)
+    indoor_trend = estimate_indoor_trend_c_per_hour(90)
+    thermal_profile = learn_thermal_profile(now)
+
     decision = compute_supply_temperature(
         indoor_temp_c=indoor_temp,
         sensor_timestamp=sensor_ts,
@@ -97,7 +109,7 @@ def run_cycle(dry_run: bool = False) -> Dict[str, Any]:
         solar_wm2=weather.current_solar_wm2,
         max_next_3h_solar_wm2=weather.max_next_3h_solar_wm2,
         indoor_trend_c_per_h=indoor_trend,
-        learned_heating_rate_c_per_h=learned_rate,
+        thermal_profile=thermal_profile,
     )
 
     boiler = ViessmannClient()
@@ -164,6 +176,9 @@ def run_cycle(dry_run: bool = False) -> Dict[str, Any]:
         "active_target_room_temp_c": decision.active_target_room_temp_c,
         "schedule_mode": schedule_mode,
         "target_supply_temp_c": target_supply_for_log,
+        "estimated_preheat_minutes": decision.estimated_preheat_minutes,
+        "k_heat": thermal_profile.k_heat,
+        "k_loss": thermal_profile.k_loss,
         "written": written,
         "dry_run": dry_run,
         "reason": decision_reason,

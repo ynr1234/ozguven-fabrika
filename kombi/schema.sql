@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS control_state (
     target_room_temp_c DOUBLE PRECISION NOT NULL DEFAULT 22.0,
     comfort_temp_c DOUBLE PRECISION NOT NULL DEFAULT 22.0,
     away_temp_c DOUBLE PRECISION NOT NULL DEFAULT 20.0,
+    away_start_time TEXT NOT NULL DEFAULT '08:00',
+    comfort_ready_time TEXT NOT NULL DEFAULT '17:30',
     integral_error DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     last_error DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     last_output_supply_temp_c DOUBLE PRECISION NOT NULL DEFAULT 42.0,
@@ -68,12 +70,17 @@ CREATE TABLE IF NOT EXISTS control_state (
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS automation_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS comfort_temp_c DOUBLE PRECISION NOT NULL DEFAULT 22.0;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS away_temp_c DOUBLE PRECISION NOT NULL DEFAULT 20.0;
+ALTER TABLE control_state ADD COLUMN IF NOT EXISTS away_start_time TEXT NOT NULL DEFAULT '08:00';
+ALTER TABLE control_state ADD COLUMN IF NOT EXISTS comfort_ready_time TEXT NOT NULL DEFAULT '17:30';
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS last_outside_temp_c DOUBLE PRECISION;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS last_solar_wm2 DOUBLE PRECISION;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS last_schedule_mode TEXT;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS last_decision_reason TEXT;
 ALTER TABLE control_state ADD COLUMN IF NOT EXISTS last_boiler_json JSONB;
 
-INSERT INTO control_state (id, automation_enabled, target_room_temp_c, comfort_temp_c, away_temp_c, last_output_supply_temp_c)
-VALUES (1, TRUE, 22.0, 22.0, 20.0, 42.0)
+INSERT INTO control_state (
+    id, automation_enabled, target_room_temp_c, comfort_temp_c, away_temp_c,
+    away_start_time, comfort_ready_time, last_output_supply_temp_c
+)
+VALUES (1, TRUE, 22.0, 22.0, 20.0, '08:00', '17:30', 42.0)
 ON CONFLICT (id) DO NOTHING;

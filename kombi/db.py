@@ -1,6 +1,7 @@
-"""Neon PostgreSQL veritabanı erişim katmanı."""
+"""Neon PostgreSQL veritabanı erişim ve adaptif ısıl öğrenme katmanı."""
 
 import json
+import math
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ from typing import Any, Dict, Iterator, List, Optional
 import psycopg
 from psycopg.rows import dict_row
 
-from .pi_controller import PIState
+from .pi_controller import PIState, ThermalProfile
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class ControlSettings:
     automation_enabled: bool
     comfort_temp_c: float
     away_temp_c: float
+    away_start_time: str
+    comfort_ready_time: str
     target_room_temp_c: float
     pi_state: PIState
     last_sensor_temp_c: Optional[float]
@@ -122,6 +125,8 @@ def load_control_settings() -> ControlSettings:
             automation_enabled=True,
             comfort_temp_c=22.0,
             away_temp_c=20.0,
+            away_start_time="08:00",
+            comfort_ready_time="17:30",
             target_room_temp_c=22.0,
             pi_state=PIState(),
             last_sensor_temp_c=None,
@@ -136,6 +141,8 @@ def load_control_settings() -> ControlSettings:
         automation_enabled=bool(row.get("automation_enabled", True)),
         comfort_temp_c=float(row.get("comfort_temp_c", 22.0)),
         away_temp_c=float(row.get("away_temp_c", 20.0)),
+        away_start_time=str(row.get("away_start_time") or "08:00"),
+        comfort_ready_time=str(row.get("comfort_ready_time") or "17:30"),
         target_room_temp_c=float(row["target_room_temp_c"]),
         pi_state=PIState(
             integral_error=float(row["integral_error"]),
@@ -157,6 +164,8 @@ def update_user_settings(
     automation_enabled: Optional[bool] = None,
     comfort_temp_c: Optional[float] = None,
     away_temp_c: Optional[float] = None,
+    away_start_time: Optional[str] = None,
+    comfort_ready_time: Optional[str] = None,
 ) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -165,10 +174,18 @@ def update_user_settings(
                 UPDATE control_state
                 SET automation_enabled = COALESCE(%s, automation_enabled),
                     comfort_temp_c = COALESCE(%s, comfort_temp_c),
-                    away_temp_c = COALESCE(%s, away_temp_c)
+                    away_temp_c = COALESCE(%s, away_temp_c),
+                    away_start_time = COALESCE(%s, away_start_time),
+                    comfort_ready_time = COALESCE(%s, comfort_ready_time)
                 WHERE id = 1
                 """,
-                (automation_enabled, comfort_temp_c, away_temp_c),
+                (
+                    automation_enabled,
+                    comfort_temp_c,
+                    away_temp_c,
+                    away_start_time,
+                    comfort_ready_time,
+                ),
             )
         conn.commit()
 
@@ -324,35 +341,89 @@ def estimate_indoor_trend_c_per_hour(lookback_minutes: int = 90) -> float:
     return max(-2.0, min(2.0, round(rate, 3)))
 
 
-def estimate_learned_heating_rate_c_per_hour(default_rate: float = 0.45) -> float:
-    """Son 7 günde brülör yanarken odanın ortalama ısınma hızını (°C/saat) öğrenir."""
+def learn_thermal_profile(now_utc: Optional[datetime] = None) -> ThermalProfile:
+    """Son 14 günlük kayıtlardan evin soğuma (k_loss) ve ısınma (k_heat) katsayılarını öğrenir."""
+    now_utc = now_utc or datetime.now(timezone.utc)
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT indoor_temp_c, burner_active, recorded_at
+                SELECT indoor_temp_c, outside_temp_c, solar_radiation_wm2,
+                       boiler_supply_temp_c, burner_active, recorded_at
                 FROM temperature_logs
                 WHERE indoor_temp_c IS NOT NULL
-                  AND recorded_at >= NOW() - INTERVAL '7 days'
+                  AND recorded_at >= NOW() - INTERVAL '14 days'
                 ORDER BY recorded_at ASC
                 """
             )
             rows = cur.fetchall()
 
-    rates: List[float] = []
+    loss_num, loss_den, loss_count = 0.0, 0.0, 0
+    for prev, curr in zip(rows, rows[1:]):
+        if prev.get("burner_active") or curr.get("burner_active"):
+            continue
+        if prev.get("outside_temp_c") is None or curr.get("outside_temp_c") is None:
+            continue
+        solar = curr.get("solar_radiation_wm2")
+        if solar is not None and float(solar) >= 120.0:
+            continue
+        dt_h = (curr["recorded_at"] - prev["recorded_at"]).total_seconds() / 3600.0
+        if not (0.05 <= dt_h <= 0.75):
+            continue
+        avg_in = 0.5 * (float(prev["indoor_temp_c"]) + float(curr["indoor_temp_c"]))
+        avg_out = 0.5 * (float(prev["outside_temp_c"]) + float(curr["outside_temp_c"]))
+        delta_out = avg_in - avg_out
+        if delta_out < 3.0:
+            continue
+        d_temp = float(curr["indoor_temp_c"]) - float(prev["indoor_temp_c"])
+        dt_rate = d_temp / dt_h
+        if not (-1.0 <= dt_rate <= 0.05):
+            continue
+        sample_loss = max(0.0, -dt_rate) / delta_out
+        if 0.003 <= sample_loss <= 0.060:
+            age_days = max(0.0, (now_utc - curr["recorded_at"]).total_seconds() / 86400.0)
+            w = math.exp(-age_days / 5.0)
+            loss_num += sample_loss * w
+            loss_den += w
+            loss_count += 1
+
+    k_loss = (loss_num / loss_den) if loss_count >= 4 and loss_den > 0 else 0.015
+    k_loss = max(0.005, min(0.050, round(k_loss, 4)))
+
+    heat_num, heat_den, heat_count = 0.0, 0.0, 0
     for prev, curr in zip(rows, rows[1:]):
         if not (prev.get("burner_active") and curr.get("burner_active")):
             continue
-        dt_h = (curr["recorded_at"] - prev["recorded_at"]).total_seconds() / 3600.0
-        if not (0.05 <= dt_h <= 0.5):
+        if prev.get("boiler_supply_temp_c") is None or curr.get("boiler_supply_temp_c") is None:
             continue
-        d_temp = float(curr["indoor_temp_c"]) - float(prev["indoor_temp_c"])
-        rate = d_temp / dt_h
-        if 0.1 <= rate <= 1.5:
-            rates.append(rate)
+        dt_h = (curr["recorded_at"] - prev["recorded_at"]).total_seconds() / 3600.0
+        if not (0.05 <= dt_h <= 0.75):
+            continue
+        avg_in = 0.5 * (float(prev["indoor_temp_c"]) + float(curr["indoor_temp_c"]))
+        avg_sup = 0.5 * (float(prev["boiler_supply_temp_c"]) + float(curr["boiler_supply_temp_c"]))
+        delta_sup = avg_sup - avg_in
+        if delta_sup < 12.0:
+            continue
+        out_vals = [v for v in (prev.get("outside_temp_c"), curr.get("outside_temp_c")) if v is not None]
+        avg_out = (sum(float(v) for v in out_vals) / len(out_vals)) if out_vals else 10.0
+        dt_rate = (float(curr["indoor_temp_c"]) - float(prev["indoor_temp_c"])) / dt_h
+        if not (-0.3 <= dt_rate <= 2.0):
+            continue
+        gross_gain = dt_rate + k_loss * max(0.0, avg_in - avg_out)
+        sample_heat = gross_gain / delta_sup
+        if 0.005 <= sample_heat <= 0.080:
+            age_days = max(0.0, (now_utc - curr["recorded_at"]).total_seconds() / 86400.0)
+            w = math.exp(-age_days / 5.0)
+            heat_num += sample_heat * w
+            heat_den += w
+            heat_count += 1
 
-    if len(rates) < 3:
-        return default_rate
+    k_heat = (heat_num / heat_den) if heat_count >= 4 and heat_den > 0 else 0.032
+    k_heat = max(0.010, min(0.065, round(k_heat, 4)))
 
-    avg_rate = sum(rates) / len(rates)
-    return max(0.25, min(1.2, round(avg_rate, 3)))
+    return ThermalProfile(
+        k_heat=k_heat,
+        k_loss=k_loss,
+        heat_samples=heat_count,
+        loss_samples=loss_count,
+    )

@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -13,8 +14,8 @@ from fastapi.templating import Jinja2Templates
 
 from .db import (
     estimate_indoor_trend_c_per_hour,
-    estimate_learned_heating_rate_c_per_hour,
     get_recent_logs,
+    learn_thermal_profile,
     load_control_settings,
     update_user_settings,
 )
@@ -56,12 +57,36 @@ def _format_tr_time(dt: Optional[datetime]) -> str:
     return dt.astimezone(TR_TZ).strftime("%d.%m.%Y %H:%M")
 
 
+def _valid_hhmm(raw: str, fallback: str) -> str:
+    val = raw.strip()
+    if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", val):
+        return val
+    return fallback
+
+
 def _build_dashboard_context(message: Optional[str] = None) -> Dict[str, Any]:
     settings = load_control_settings()
     logs = get_recent_logs(limit=24)
     boiler = settings.last_boiler_json or {}
     trend = estimate_indoor_trend_c_per_hour(90)
-    learned_rate = estimate_learned_heating_rate_c_per_hour(0.45)
+    profile = learn_thermal_profile()
+
+    cur_in = settings.last_sensor_temp_c if settings.last_sensor_temp_c is not None else settings.away_temp_c
+    est_2c_min = profile.estimate_minutes_to_raise(
+        delta_temp_c=2.0,
+        indoor_temp_c=cur_in,
+        outside_temp_c=settings.last_outside_temp_c,
+        supply_temp_c=46.0,
+    )
+    est_net_rate = profile.predicted_net_heating_rate(
+        supply_temp_c=46.0,
+        indoor_temp_c=cur_in,
+        outside_temp_c=settings.last_outside_temp_c,
+    )
+    est_cool_rate = profile.predicted_cooling_rate(
+        indoor_temp_c=cur_in,
+        outside_temp_c=settings.last_outside_temp_c,
+    )
 
     formatted_logs = []
     for row in logs:
@@ -85,7 +110,10 @@ def _build_dashboard_context(message: Optional[str] = None) -> Dict[str, Any]:
         "settings": settings,
         "boiler": boiler,
         "trend": trend,
-        "learned_rate": learned_rate,
+        "profile": profile,
+        "est_2c_min": est_2c_min,
+        "est_net_rate": est_net_rate,
+        "est_cool_rate": est_cool_rate,
         "last_update_tr": _format_tr_time(settings.pi_state.updated_at),
         "last_sensor_tr": _format_tr_time(settings.last_sensor_at),
         "logs": formatted_logs,
@@ -132,6 +160,8 @@ def kombi_update_settings(
     automation_enabled: Optional[str] = Form(None),
     comfort_temp_c: float = Form(...),
     away_temp_c: float = Form(...),
+    away_start_time: str = Form("08:00"),
+    comfort_ready_time: str = Form("17:30"),
 ) -> RedirectResponse:
     if not _is_authenticated(request):
         return RedirectResponse(url="/kombi?msg=Oturum%20gerekli", status_code=303)
@@ -139,11 +169,15 @@ def kombi_update_settings(
     comfort = max(16.0, min(26.0, round(comfort_temp_c, 1)))
     away = max(15.0, min(24.0, round(away_temp_c, 1)))
     enabled = automation_enabled == "on"
+    start_t = _valid_hhmm(away_start_time, "08:00")
+    ready_t = _valid_hhmm(comfort_ready_time, "17:30")
 
     update_user_settings(
         automation_enabled=enabled,
         comfort_temp_c=comfort,
         away_temp_c=away,
+        away_start_time=start_t,
+        comfort_ready_time=ready_t,
     )
     return RedirectResponse(url="/kombi?msg=Ayarlar%20kaydedildi", status_code=303)
 
@@ -177,11 +211,14 @@ def kombi_status_api(request: Request, pin: Optional[str] = Query(None)) -> JSON
     if not _is_authenticated(request, pin_param=pin):
         return JSONResponse({"error": "Yetkisiz erişim (PIN geçersiz)."}, status_code=401)
     settings = load_control_settings()
+    profile = learn_thermal_profile()
     return JSONResponse(
         {
             "automation_enabled": settings.automation_enabled,
             "comfort_temp_c": settings.comfort_temp_c,
             "away_temp_c": settings.away_temp_c,
+            "away_start_time": settings.away_start_time,
+            "comfort_ready_time": settings.comfort_ready_time,
             "active_target_room_temp_c": settings.target_room_temp_c,
             "indoor_temp_c": settings.last_sensor_temp_c,
             "outside_temp_c": settings.last_outside_temp_c,
@@ -189,6 +226,10 @@ def kombi_status_api(request: Request, pin: Optional[str] = Query(None)) -> JSON
             "schedule_mode": settings.last_schedule_mode,
             "decision_reason": settings.last_decision_reason,
             "last_output_supply_temp_c": settings.pi_state.last_output_supply_temp_c,
+            "k_heat": profile.k_heat,
+            "k_loss": profile.k_loss,
+            "heat_samples": profile.heat_samples,
+            "loss_samples": profile.loss_samples,
             "boiler": settings.last_boiler_json,
         }
     )

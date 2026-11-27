@@ -50,16 +50,15 @@
     .sub { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
     .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    input[type="number"], input[type="password"] {
+    input[type="number"], input[type="password"], input[type="time"] {
       background: #0f172a; color: var(--text); border: 1px solid var(--border);
-      border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; width: 130px;
+      border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; width: 125px;
     }
     button {
       background: var(--accent); color: #0f172a; border: none; border-radius: 8px;
       padding: 9px 14px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
     }
     button.secondary { background: #334155; color: var(--text); }
-    button.danger { background: var(--danger); color: #fff; }
     .alert {
       background: rgba(56,189,248,0.14); border: 1px solid rgba(56,189,248,0.4);
       padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.9rem;
@@ -123,14 +122,17 @@
         <div class="value">{{ "%.2f"|format(settings.last_sensor_temp_c) if settings.last_sensor_temp_c is not none else "-" }} °C</div>
         <div class="sub">
           Hedef: <strong>{{ "%.1f"|format(settings.target_room_temp_c) }} °C</strong> |
-          Trend: {{ "%+.2f"|format(trend) }} °C/sa (Öğrenilen: {{ "%.2f"|format(learned_rate) }} °C/sa)
+          Trend: {{ "%+.2f"|format(trend) }} °C/sa
         </div>
       </div>
 
       <div class="card">
-        <div class="label">Dış Hava (Denizli Başkarcı)</div>
-        <div class="value">{{ "%.1f"|format(settings.last_outside_temp_c) if settings.last_outside_temp_c is not none else "-" }} °C</div>
-        <div class="sub">Güneş Radyasyonu: {{ "%.0f"|format(settings.last_solar_wm2) if settings.last_solar_wm2 is not none else "-" }} W/m²</div>
+        <div class="label">Öğrenilen Ev Isıl Profili</div>
+        <div class="value">~{{ est_2c_min }} dk <span style="font-size:0.9rem; color:var(--muted);">/ +2°C</span></div>
+        <div class="sub">
+          Isınma: +{{ "%.2f"|format(est_net_rate) }} °C/sa ({{ profile.heat_samples }} veri) |
+          Soğuma: -{{ "%.2f"|format(est_cool_rate) }} °C/sa ({{ profile.loss_samples }} veri)
+        </div>
       </div>
 
       <div class="card">
@@ -146,17 +148,14 @@
       </div>
 
       <div class="card">
-        <div class="label">Basınç &amp; Tüketim</div>
+        <div class="label">Dış Hava &amp; Basınç &amp; Gaz</div>
         <div class="value">
-          {{ boiler.get("pressure_bar", "-") }} bar
-          {% if boiler.get("pressure_bar") is not none and (boiler.get("pressure_bar") < 1.0 or boiler.get("pressure_bar") > 2.5) %}
-            <span class="badge badge-warn">Kontrol Et</span>
-          {% endif %}
+          {{ "%.1f"|format(settings.last_outside_temp_c) if settings.last_outside_temp_c is not none else "-" }} °C
+          <span style="font-size:1rem; color:var(--muted);">| {{ boiler.get("pressure_bar", "-") }} bar</span>
         </div>
         <div class="sub">
-          Bugün gaz: {{ boiler.get("gas_heating_today_m3", "-") }} m³ |
-          Bu ay: {{ boiler.get("gas_heating_month_m3", "-") }} m³ |
-          Start: {{ boiler.get("burner_starts", "-") }}
+          Güneş: {{ "%.0f"|format(settings.last_solar_wm2) if settings.last_solar_wm2 is not none else "-" }} W/m² |
+          Gaz: {{ boiler.get("gas_heating_today_m3", "-") }} m³ ({{ boiler.get("gas_heating_month_m3", "-") }} ay)
         </div>
       </div>
     </div>
@@ -167,24 +166,32 @@
     </div>
 
     <div class="card" style="margin-bottom: 16px;">
-      <h2 style="font-size:1rem; margin:0 0 12px 0;">Kontrol ve Hedef Sıcaklık Ayarları</h2>
+      <h2 style="font-size:1rem; margin:0 0 12px 0;">Kontrol, Sıcaklık ve Saat Ayarları</h2>
       <form method="post" action="/kombi/settings" class="row">
-        <label class="switch" style="margin-right: 12px; padding-bottom: 8px;">
+        <label class="switch" style="margin-right: 8px; padding-bottom: 8px;">
           <input type="checkbox" name="automation_enabled" {% if settings.automation_enabled %}checked{% endif %} />
           Otomasyonu Aktif Et
         </label>
         <div class="field">
-          <label class="label" for="comfort_temp_c">Konfor Hedefi (°C)</label>
+          <label class="label" for="comfort_temp_c">Konfor (°C)</label>
           <input id="comfort_temp_c" name="comfort_temp_c" type="number" step="0.5" min="16" max="26" value="{{ settings.comfort_temp_c }}" />
         </div>
         <div class="field">
-          <label class="label" for="away_temp_c">Ev Boşken / Ekonomi (°C)</label>
+          <label class="label" for="away_temp_c">Ekonomi (°C)</label>
           <input id="away_temp_c" name="away_temp_c" type="number" step="0.5" min="15" max="24" value="{{ settings.away_temp_c }}" />
+        </div>
+        <div class="field">
+          <label class="label" for="away_start_time">Çıkış Saati</label>
+          <input id="away_start_time" name="away_start_time" type="time" value="{{ settings.away_start_time }}" />
+        </div>
+        <div class="field">
+          <label class="label" for="comfort_ready_time">Hazır Olma Saati</label>
+          <input id="comfort_ready_time" name="comfort_ready_time" type="time" value="{{ settings.comfort_ready_time }}" />
         </div>
         <button type="submit">Ayarları Kaydet</button>
       </form>
       <div class="sub" style="margin-top: 10px;">
-        Program: Hafta içi 08:00–17:30 Ekonomi (15:30 sonrası dinamik ön ısıtma), diğer tüm saatler ve hafta sonu Konfor.
+        Hafta içi {{ settings.away_start_time }}–{{ settings.comfort_ready_time }} arası Ekonomi modundadır; öğrenilen ev hızına göre {{ settings.comfort_ready_time }}'da hedefe yetişecek şekilde ön ısıtma başlatılır. Hafta sonu tüm gün Konfor modundadır.
       </div>
       <div class="row" style="margin-top: 12px;">
         <form method="post" action="/kombi/run-now">
