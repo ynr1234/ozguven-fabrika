@@ -7,8 +7,8 @@ from typing import Optional
 
 import httpx
 
-DEFAULT_LAT = 37.760
-DEFAULT_LON = 29.020
+DEFAULT_LAT = 37.772735
+DEFAULT_LON = 28.992537
 CACHE_TTL_SECONDS = 600
 
 

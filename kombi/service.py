@@ -108,6 +108,7 @@ def run_cycle(dry_run: bool = False) -> Dict[str, Any]:
         min_next_3h_outside_c=weather.min_next_3h_temp_c,
         solar_wm2=weather.current_solar_wm2,
         max_next_3h_solar_wm2=weather.max_next_3h_solar_wm2,
+        cloud_cover_pct=weather.cloud_cover_pct,
         indoor_trend_c_per_h=indoor_trend,
         thermal_profile=thermal_profile,
     )

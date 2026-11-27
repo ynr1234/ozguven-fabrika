@@ -169,6 +169,7 @@ def compute_supply_temperature(
     min_next_3h_outside_c: Optional[float] = None,
     solar_wm2: Optional[float] = None,
     max_next_3h_solar_wm2: Optional[float] = None,
+    cloud_cover_pct: Optional[float] = None,
     indoor_trend_c_per_h: float = 0.0,
     thermal_profile: Optional[ThermalProfile] = None,
 ) -> ControlDecision:
@@ -227,9 +228,12 @@ def compute_supply_temperature(
         )
 
     error = active_target - indoor_temp_c
+    local_minutes = now.astimezone(ISTANBUL_TZ).hour * 60 + now.astimezone(ISTANBUL_TZ).minute
+    # Yatak odası Kuzey-Batı, oturma odası Güney-Batı + eğimli çatı: yalnızca 12:30-16:30 arası doğrudan güneş kazancı olur
+    in_sw_sun_window = (12 * 60 + 30) <= local_minutes <= (16 * 60 + 30)
 
     # 2. Güneş / Aşırı Isınma Koruması veya Coast-Down -> Kombi 30°C tabana çekilir
-    solar_active = (solar_wm2 is not None and solar_wm2 >= 300.0)
+    solar_active = in_sw_sun_window and (solar_wm2 is not None and solar_wm2 >= 400.0)
     early_solar_or_rising_cutoff = error <= -0.15 and (indoor_trend_c_per_h >= 0.15 or solar_active)
     if schedule_mode == "COAST_DOWN" or error <= -config.idle_deadband_c or early_solar_or_rising_cutoff:
         decayed_integral = max(0.0, state.integral_error * 0.5)
@@ -248,7 +252,7 @@ def compute_supply_temperature(
             ),
         )
 
-    # 3. Adaptif Feedforward + Yumuşak PI + Trend/Güneş Sönümleme
+    # 3. Adaptif Feedforward + Yumuşak PI + Trend/Güneş/Çatı Telafisi
     if state.updated_at is not None:
         last_dt = state.updated_at if state.updated_at.tzinfo else state.updated_at.replace(tzinfo=timezone.utc)
         dt = max(1.0, min(1800.0, (now - last_dt).total_seconds()))
@@ -263,11 +267,17 @@ def compute_supply_temperature(
     i_term = config.ki * clamped_integral
     trend_adj = -config.trend_damping * max(0.0, indoor_trend_c_per_h)
 
+    # Eğimli çatı + KB/GB cephe nedeniyle yalnızca öğleden sonra güçlü güneşte hafif (-0.8°C) indirim
     solar_adj = 0.0
-    if max_next_3h_solar_wm2 is not None and max_next_3h_solar_wm2 >= 350.0 and error < 1.0:
-        solar_adj = -1.5
+    if in_sw_sun_window and max_next_3h_solar_wm2 is not None and max_next_3h_solar_wm2 >= 400.0 and error < 0.8:
+        solar_adj = -0.8
 
-    raw_supply = base_supply + p_term + i_term + trend_adj + solar_adj
+    # Çatı katında bulutsuz açık gecelerde gökyüzüne ışıma kaybı biraz daha yüksek olur
+    attic_night_adj = 0.0
+    if (solar_wm2 is not None and solar_wm2 < 20.0) and (cloud_cover_pct is not None and cloud_cover_pct <= 30.0):
+        attic_night_adj = 0.8
+
+    raw_supply = base_supply + p_term + i_term + trend_adj + solar_adj + attic_night_adj
 
     # 4. Kısa Döngü Koruması + Yoğuşma Tavanı
     bounded_supply = max(
