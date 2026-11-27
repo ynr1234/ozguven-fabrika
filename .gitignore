@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+local_test.db
+vicare_token.json
+vicare_token.save

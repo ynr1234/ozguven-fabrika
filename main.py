@@ -143,6 +143,17 @@ with engine.connect() as conn:
 app = FastAPI(title="Özgüven Kablo - Üretim & Kontrol Sistemleri")
 templates = Jinja2Templates(directory="templates")
 
+from kombi.db import init_schema as init_kombi_schema
+from kombi.web import router as kombi_router
+
+if os.getenv("KOMBI_DATABASE_URL") or "postgresql" in DATABASE_URL:
+    try:
+        init_kombi_schema()
+    except Exception as e:
+        print(f"Kombi schema init bypassed: {e}")
+
+app.include_router(kombi_router)
+
 PERSONEL_ISIMLERI = list(PERSONEL_DB.keys())
 MAKINE_LISTESI = [
     "BAKIR 07", "BETA", "DOMEKS 1", "DOMEKS 2", "DRUM1", "DRUM2", "EFAF",

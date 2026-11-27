@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kombi Akıllı Kontrol Paneli</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+    .header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      gap: 12px; margin-bottom: 18px;
+    }
+    h1 { font-size: 1.35rem; margin: 0; }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 600;
+    }
+    .badge-ok { background: rgba(34,197,94,0.18); color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
+    .badge-off { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+    .badge-warn { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px; margin-bottom: 16px;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px;
+    }
+    .label { color: var(--muted); font-size: 0.8rem; margin-bottom: 4px; }
+    .value { font-size: 1.45rem; font-weight: 700; }
+    .sub { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    input[type="number"], input[type="password"] {
+      background: #0f172a; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px; font-size: 0.95rem; width: 130px;
+    }
+    button {
+      background: var(--accent); color: #0f172a; border: none; border-radius: 8px;
+      padding: 9px 14px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
+    }
+    button.secondary { background: #334155; color: var(--text); }
+    button.danger { background: var(--danger); color: #fff; }
+    .alert {
+      background: rgba(56,189,248,0.14); border: 1px solid rgba(56,189,248,0.4);
+      padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.9rem;
+    }
+    .alert-err {
+      background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.45); color: #fca5a5;
+    }
+    .switch {
+      display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;
+    }
+    .switch input { width: 18px; height: 18px; accent-color: var(--ok); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 7px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-weight: 600; }
+    .table-wrap { overflow-x: auto; }
+    .login-box { max-width: 360px; margin: 60px auto; }
+  </style>
+</head>
+<body>
+<div class="container">
+  {% if not authenticated %}
+    <div class="card login-box">
+      <h1 style="margin-bottom: 8px;">Kombi Kontrol Paneli</h1>
+      <p class="sub" style="margin-bottom: 14px;">Devam etmek için yönetici şifresini girin.</p>
+      {% if error %}
+        <div class="alert alert-err">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/kombi/login" class="row">
+        <div class="field" style="flex: 1;">
+          <label class="label" for="pin">Şifre (PIN)</label>
+          <input id="pin" name="pin" type="password" inputmode="numeric" required autofocus style="width: 100%;" />
+        </div>
+        <button type="submit">Giriş Yap</button>
+      </form>
+    </div>
+  {% else %}
+    <div class="header">
+      <div>
+        <h1>Viessmann Vitodens 050-W Akıllı Otomasyon</h1>
+        <div class="sub">Son güncelleme: {{ last_update_tr }} | Mod: <strong>{{ settings.last_schedule_mode or '-' }}</strong></div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        {% if settings.automation_enabled %}
+          <span class="badge badge-ok">Otomasyon AÇIK</span>
+        {% else %}
+          <span class="badge badge-off">Otomasyon KAPALI</span>
+        {% endif %}
+        <form method="post" action="/kombi/logout" style="margin:0;">
+          <button type="submit" class="secondary">Çıkış</button>
+        </form>
+      </div>
+    </div>
+
+    {% if message %}
+      <div class="alert">{{ message }}</div>
+    {% endif %}
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Ev İç Sıcaklığı (2 Klima Ort.)</div>
+        <div class="value">{{ "%.2f"|format(settings.last_sensor_temp_c) if settings.last_sensor_temp_c is not none else "-" }} °C</div>
+        <div class="sub">
+          Hedef: <strong>{{ "%.1f"|format(settings.target_room_temp_c) }} °C</strong> |
+          Trend: {{ "%+.2f"|format(trend) }} °C/sa (Öğrenilen: {{ "%.2f"|format(learned_rate) }} °C/sa)
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">Dış Hava (Denizli Başkarcı)</div>
+        <div class="value">{{ "%.1f"|format(settings.last_outside_temp_c) if settings.last_outside_temp_c is not none else "-" }} °C</div>
+        <div class="sub">Güneş Radyasyonu: {{ "%.0f"|format(settings.last_solar_wm2) if settings.last_solar_wm2 is not none else "-" }} W/m²</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Kazan Gidiş Suyu / Hedef</div>
+        <div class="value">
+          {{ boiler.get("supply_temp_c", "-") }} °C
+          <span style="font-size:1rem; color:var(--muted);">→ {{ "%.0f"|format(settings.pi_state.last_output_supply_temp_c) }} °C</span>
+        </div>
+        <div class="sub">
+          Brülör: {{ "YANIYOR" if boiler.get("burner_active") else "BEKLEMEDE" }}
+          ({{ boiler.get("modulation_pct", "-") }}%) | Pompa: {{ boiler.get("pump_status", "-") }}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">Basınç &amp; Tüketim</div>
+        <div class="value">
+          {{ boiler.get("pressure_bar", "-") }} bar
+          {% if boiler.get("pressure_bar") is not none and (boiler.get("pressure_bar") < 1.0 or boiler.get("pressure_bar") > 2.5) %}
+            <span class="badge badge-warn">Kontrol Et</span>
+          {% endif %}
+        </div>
+        <div class="sub">
+          Bugün gaz: {{ boiler.get("gas_heating_today_m3", "-") }} m³ |
+          Bu ay: {{ boiler.get("gas_heating_month_m3", "-") }} m³ |
+          Start: {{ boiler.get("burner_starts", "-") }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <div class="label">Son Karar Gerekçesi</div>
+      <div>{{ settings.last_decision_reason or "Henüz kontrol döngüsü çalıştırılmadı." }}</div>
+    </div>
+
+    <div class="card" style="margin-bottom: 16px;">
+      <h2 style="font-size:1rem; margin:0 0 12px 0;">Kontrol ve Hedef Sıcaklık Ayarları</h2>
+      <form method="post" action="/kombi/settings" class="row">
+        <label class="switch" style="margin-right: 12px; padding-bottom: 8px;">
+          <input type="checkbox" name="automation_enabled" {% if settings.automation_enabled %}checked{% endif %} />
+          Otomasyonu Aktif Et
+        </label>
+        <div class="field">
+          <label class="label" for="comfort_temp_c">Konfor Hedefi (°C)</label>
+          <input id="comfort_temp_c" name="comfort_temp_c" type="number" step="0.5" min="16" max="26" value="{{ settings.comfort_temp_c }}" />
+        </div>
+        <div class="field">
+          <label class="label" for="away_temp_c">Ev Boşken / Ekonomi (°C)</label>
+          <input id="away_temp_c" name="away_temp_c" type="number" step="0.5" min="15" max="24" value="{{ settings.away_temp_c }}" />
+        </div>
+        <button type="submit">Ayarları Kaydet</button>
+      </form>
+      <div class="sub" style="margin-top: 10px;">
+        Program: Hafta içi 08:00–17:30 Ekonomi (15:30 sonrası dinamik ön ısıtma), diğer tüm saatler ve hafta sonu Konfor.
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <form method="post" action="/kombi/run-now">
+          <button type="submit" class="secondary">Şimdi Kontrol Döngüsünü Çalıştır</button>
+        </form>
+        <form method="post" action="/kombi/run-now">
+          <input type="hidden" name="dry_run" value="on" />
+          <button type="submit" class="secondary">Kuru Test (Kombiye Yazma)</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem; margin:0 0 10px 0;">Son Kayıtlar (Son 24 Döngü)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Saat (TR)</th>
+              <th>Mod</th>
+              <th>Oda (°C)</th>
+              <th>Hedef (°C)</th>
+              <th>Dış (°C)</th>
+              <th>Gidiş / Karar</th>
+              <th>Brülör / Mod</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in logs %}
+            <tr>
+              <td>{{ row.time }}</td>
+              <td>{{ row.mode }}</td>
+              <td>{{ "%.2f"|format(row.indoor) if row.indoor is not none else "-" }}</td>
+              <td>{{ "%.1f"|format(row.target_room) if row.target_room is not none else "-" }}</td>
+              <td>{{ "%.1f"|format(row.outside) if row.outside is not none else "-" }}</td>
+              <td>{{ row.supply if row.supply is not none else "-" }} → {{ "%.0f"|format(row.target_supply) if row.target_supply is not none else "-" }} °C</td>
+              <td>{{ "Açık" if row.burner else "Kapalı" }} ({{ row.mod if row.mod is not none else "-" }}%)</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+</body>
+</html>
